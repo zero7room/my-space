@@ -8,7 +8,9 @@
       "dist/**",
       "coverage/**",
       "data/**",
-      "**/*.zip"
+      "**/*.zip",
+      "apps/*/dist/**",
+      "apps/*/node_modules/**"
     ]
   },
   "organizeImports": { "enabled": true },
