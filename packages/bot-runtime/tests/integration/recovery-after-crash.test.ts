@@ -2,10 +2,10 @@ import { mkdir, mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { writeJson } from "../../src/storage/json-file.js";
-import { createPaths } from "../../src/storage/paths.js";
 import { createStubLlmClient } from "../../src/llm/client.js";
 import { createHybridHost } from "../../src/runtime/hybrid-host.js";
+import { writeJson } from "../../src/storage/json-file.js";
+import { createPaths } from "../../src/storage/paths.js";
 
 describe("E2E: crash recovery", () => {
   let dataRoot: string;

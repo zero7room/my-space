@@ -44,9 +44,9 @@ describe("TaskRepo", () => {
     await repo.transitionStatus(t.id, "confirmed", { confirmedByUserId: ids.user });
     await repo.transitionStatus(t.id, "queued");
     await repo.transitionStatus(t.id, "running");
-    await expect(
-      repo.transitionStatus(t.id, "draft" as never),
-    ).rejects.toThrow(/illegal transition/);
+    await expect(repo.transitionStatus(t.id, "draft" as never)).rejects.toThrow(
+      /illegal transition/,
+    );
   });
 
   it("listByThread filters by threadId and status", async () => {

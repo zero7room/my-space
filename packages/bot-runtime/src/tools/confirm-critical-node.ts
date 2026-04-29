@@ -1,15 +1,11 @@
 import { z } from "zod";
-import {
-  InterruptSignalSchema,
-  type InterruptSignal,
-} from "./ask-clarification.js";
-import { defineTool, type Tool } from "./tool.js";
+import { type InterruptSignal, InterruptSignalSchema } from "./ask-clarification.js";
+import { type Tool, defineTool } from "./tool.js";
 
 export function createConfirmCriticalNodeTool(): Tool {
   return defineTool({
     name: "confirm_critical_node",
-    description:
-      "Pause execution at a critical node policy hit and request user approval.",
+    description: "Pause execution at a critical node policy hit and request user approval.",
     readOnly: true,
     destructive: false,
     concurrencySafe: false,

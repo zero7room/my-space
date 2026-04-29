@@ -9,9 +9,7 @@ export type AnthropicLlmClientOptions = {
   sdk?: Pick<Anthropic, "messages">;
 };
 
-export function createAnthropicLlmClient(
-  opts: AnthropicLlmClientOptions,
-): LlmClient {
+export function createAnthropicLlmClient(opts: AnthropicLlmClientOptions): LlmClient {
   const sdk = opts.sdk ?? new Anthropic({ apiKey: opts.apiKey });
   return {
     async complete(req: LlmRequest): Promise<LlmResponse> {

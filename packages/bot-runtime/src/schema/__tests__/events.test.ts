@@ -62,8 +62,6 @@ describe("ExecutorEventSchema", () => {
   });
 
   it("rejects unknown kind", () => {
-    expect(() =>
-      ExecutorEventSchema.parse({ kind: "wat", at: "2026-04-28T00:00:00Z" }),
-    ).toThrow();
+    expect(() => ExecutorEventSchema.parse({ kind: "wat", at: "2026-04-28T00:00:00Z" })).toThrow();
   });
 });

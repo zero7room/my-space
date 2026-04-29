@@ -1,6 +1,6 @@
+import { type TaskControl, TaskControlSchema } from "../schema/job.js";
 import { readJson } from "../storage/json-file.js";
 import type { Paths } from "../storage/paths.js";
-import { type TaskControl, TaskControlSchema } from "../schema/job.js";
 
 export async function readControl(
   paths: Paths,

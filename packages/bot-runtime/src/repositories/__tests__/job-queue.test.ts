@@ -28,9 +28,7 @@ describe("JobQueue", () => {
       fencingToken: 1000001,
     });
     expect(job.id).toMatch(/^job_/);
-    const pending = await readdir(
-      createPaths(dataRoot).jobsDir("rt-1", "pending"),
-    );
+    const pending = await readdir(createPaths(dataRoot).jobsDir("rt-1", "pending"));
     expect(pending.some((f) => f === `${job.id}.json`)).toBe(true);
   });
 
@@ -60,9 +58,7 @@ describe("JobQueue", () => {
     });
     const leased = await q.leaseNext({ lockHolder: "exec-1", leaseMs: 60_000 });
     await q.complete(leased!.id, { outcome: "completed" });
-    const done = await readdir(
-      createPaths(dataRoot).jobsDir("rt-1", "done"),
-    );
+    const done = await readdir(createPaths(dataRoot).jobsDir("rt-1", "done"));
     expect(done).toContain(`${leased!.id}.json`);
   });
 });

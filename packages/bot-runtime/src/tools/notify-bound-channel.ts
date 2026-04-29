@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { defineTool, type Tool } from "./tool.js";
+import { type Tool, defineTool } from "./tool.js";
 
 export const NotifyTargetSchema = z.union([
   z.literal("all"),

@@ -1,9 +1,6 @@
 import { z } from "zod";
 import type { LlmClient } from "../llm/client.js";
-import {
-  type GuardIntent,
-  GuardIntentSchema,
-} from "../schema/guard-decision.js";
+import { type GuardIntent, GuardIntentSchema } from "../schema/guard-decision.js";
 
 const IntentJsonSchema = z.object({
   intent: GuardIntentSchema,
@@ -36,15 +33,11 @@ progress_query, cancel_task, irrelevant.
 Reply ONLY with JSON: {"intent": "...", "confidence": 0..1, "reason": "...",
 "targetTaskId": "..." (optional), "targetPlanId": "..." (optional)}.`;
 
-export async function classifyIntentWithLlm(
-  input: ClassifyInput,
-): Promise<IntentClassification> {
+export async function classifyIntentWithLlm(input: ClassifyInput): Promise<IntentClassification> {
   const ctx = `thread_status=${input.threadStatus} pending_task=${input.pendingTaskId ?? "-"} pending_plan=${input.pendingPlanId ?? "-"}`;
   const resp = await input.llm.complete({
     system: SYSTEM,
-    messages: [
-      { role: "user", content: `${ctx}\n\nmessage: ${input.messageText}` },
-    ],
+    messages: [{ role: "user", content: `${ctx}\n\nmessage: ${input.messageText}` }],
     tools: [],
     temperature: 0,
     responseFormat: "json",
@@ -52,12 +45,7 @@ export async function classifyIntentWithLlm(
 
   let parsed: unknown;
   try {
-    parsed =
-      resp.kind === "json"
-        ? resp.data
-        : resp.kind === "text"
-          ? JSON.parse(resp.text)
-          : null;
+    parsed = resp.kind === "json" ? resp.data : resp.kind === "text" ? JSON.parse(resp.text) : null;
   } catch {
     parsed = null;
   }

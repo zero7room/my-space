@@ -27,10 +27,7 @@ describe("classifyIntentWithLlm", () => {
   });
 
   it("falls back to chat with low confidence on parse failure", async () => {
-    const llm = createStubLlmClient(
-      {},
-      { kind: "text", text: "I have no idea what you mean" },
-    );
+    const llm = createStubLlmClient({}, { kind: "text", text: "I have no idea what you mean" });
     const out = await classifyIntentWithLlm({
       llm,
       threadStatus: "chatting",

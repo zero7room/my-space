@@ -1,12 +1,9 @@
 import { mkdir, readFile, readdir, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { readJson, writeJson } from "../storage/json-file.js";
+import { type ChannelBinding, ChannelBindingSchema } from "../schema/channel.js";
 import { newId } from "../storage/ids.js";
+import { readJson, writeJson } from "../storage/json-file.js";
 import type { Paths } from "../storage/paths.js";
-import {
-  type ChannelBinding,
-  ChannelBindingSchema,
-} from "../schema/channel.js";
 
 export type CreateBindingInput = {
   threadId: string;
@@ -18,11 +15,7 @@ export type CreateBindingInput = {
 
 export type ChannelBindingRepo = {
   create(input: CreateBindingInput): Promise<ChannelBinding>;
-  load(
-    threadId: string,
-    provider: string,
-    bindingId: string,
-  ): Promise<ChannelBinding | null>;
+  load(threadId: string, provider: string, bindingId: string): Promise<ChannelBinding | null>;
   listForThread(threadId: string): Promise<ChannelBinding[]>;
   updateStatus(
     threadId: string,
@@ -30,22 +23,12 @@ export type ChannelBindingRepo = {
     bindingId: string,
     next: ChannelBinding["status"],
   ): Promise<ChannelBinding>;
-  claimChat(
-    provider: string,
-    externalChatId: string,
-    threadId: string,
-  ): Promise<void>;
+  claimChat(provider: string, externalChatId: string, threadId: string): Promise<void>;
   releaseChat(provider: string, externalChatId: string): Promise<void>;
-  whoClaimsChat(
-    provider: string,
-    externalChatId: string,
-  ): Promise<string | null>;
+  whoClaimsChat(provider: string, externalChatId: string): Promise<string | null>;
 };
 
-export function createChannelBindingRepo(
-  paths: Paths,
-  runtimeId: string,
-): ChannelBindingRepo {
+export function createChannelBindingRepo(paths: Paths, runtimeId: string): ChannelBindingRepo {
   return {
     async create(input) {
       const id = newId("bd");
@@ -63,26 +46,17 @@ export function createChannelBindingRepo(
         createdAt: now,
         updatedAt: now,
       });
-      await writeJson(
-        paths.binding(runtimeId, input.threadId, input.provider, id),
-        binding,
-      );
+      await writeJson(paths.binding(runtimeId, input.threadId, input.provider, id), binding);
       return binding;
     },
 
     async load(threadId, provider, bindingId) {
-      const raw = await readJson(
-        paths.binding(runtimeId, threadId, provider, bindingId),
-      );
+      const raw = await readJson(paths.binding(runtimeId, threadId, provider, bindingId));
       return raw ? ChannelBindingSchema.parse(raw) : null;
     },
 
     async listForThread(threadId) {
-      const root = path.posix.join(
-        paths.state(runtimeId),
-        "bindings",
-        threadId,
-      );
+      const root = path.posix.join(paths.state(runtimeId), "bindings", threadId);
       let providers: string[] = [];
       try {
         providers = await readdir(root);
@@ -115,10 +89,7 @@ export function createChannelBindingRepo(
         createdAt: cur.createdAt,
         updatedAt: new Date().toISOString(),
       });
-      await writeJson(
-        paths.binding(runtimeId, threadId, provider, bindingId),
-        updated,
-      );
+      await writeJson(paths.binding(runtimeId, threadId, provider, bindingId), updated);
       return updated;
     },
 
@@ -132,9 +103,7 @@ export function createChannelBindingRepo(
         existing = null;
       }
       if (existing && existing !== threadId) {
-        throw new Error(
-          `chat ${externalChatId} already claimed by thread ${existing}`,
-        );
+        throw new Error(`chat ${externalChatId} already claimed by thread ${existing}`);
       }
       await writeFile(file, threadId, "utf8");
     },

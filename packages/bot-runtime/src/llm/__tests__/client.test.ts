@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createStubLlmClient, type LlmRequest } from "../client.js";
+import { type LlmRequest, createStubLlmClient } from "../client.js";
 
 describe("createStubLlmClient", () => {
   it("returns canned reply per prompt", async () => {
@@ -16,10 +16,7 @@ describe("createStubLlmClient", () => {
   });
 
   it("falls back to default reply when prompt missing", async () => {
-    const client = createStubLlmClient(
-      {},
-      { kind: "text", text: "default" },
-    );
+    const client = createStubLlmClient({}, { kind: "text", text: "default" });
     const resp = await client.complete({
       system: "x",
       messages: [{ role: "user", content: "anything" }],

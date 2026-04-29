@@ -1,10 +1,7 @@
+import { type ExecutorEvent, ExecutorEventSchema } from "../schema/events.js";
 import { appendJsonl, readJsonl } from "../storage/jsonl.js";
 import type { Paths } from "../storage/paths.js";
 import { sanitize } from "../storage/sanitize.js";
-import {
-  type ExecutorEvent,
-  ExecutorEventSchema,
-} from "../schema/events.js";
 
 export type EventsWriter = {
   write(event: ExecutorEvent): Promise<void>;

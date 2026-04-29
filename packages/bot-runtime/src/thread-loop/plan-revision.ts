@@ -1,9 +1,9 @@
-import { writeJson } from "../storage/json-file.js";
-import type { Paths } from "../storage/paths.js";
 import type { PlanRepo } from "../repositories/plan-repo.js";
 import type { TaskRepo } from "../repositories/task-repo.js";
-import type { PlanStep } from "../schema/plan.js";
 import type { TaskControl } from "../schema/job.js";
+import type { PlanStep } from "../schema/plan.js";
+import { writeJson } from "../storage/json-file.js";
+import type { Paths } from "../storage/paths.js";
 
 export type HandlePlanRevisionInput = {
   paths: Paths;
@@ -63,7 +63,10 @@ export async function handlePlanRevision(
 
   await input.taskRepo.update(input.taskId, {
     activePlanRevisionId: newRev.id,
-    archivedRevisionIds: [...t.archivedRevisionIds, ...newRev.archivedArtifactPaths.map(() => `archive-${newRev.id}`)],
+    archivedRevisionIds: [
+      ...t.archivedRevisionIds,
+      ...newRev.archivedArtifactPaths.map(() => `archive-${newRev.id}`),
+    ],
   });
 
   await input.taskRepo.transitionStatus(input.taskId, "queued");

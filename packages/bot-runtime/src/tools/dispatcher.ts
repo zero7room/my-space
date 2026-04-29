@@ -40,9 +40,7 @@ export function createDispatcher(deps: {
       });
       const block = decisions.find((d) => d.action === "block");
       if (block) return { outcome: "blocked", decisions };
-      const requireApproval = decisions.find(
-        (d) => d.action === "require_approval",
-      );
+      const requireApproval = decisions.find((d) => d.action === "require_approval");
       if (requireApproval) return { outcome: "critical_node", decisions };
 
       try {

@@ -3,7 +3,7 @@ import path from "node:path";
 import { z } from "zod";
 import type { Paths } from "../storage/paths.js";
 import { resolveInsideWorkspace } from "./_workspace-resolver.js";
-import { defineTool, type Tool } from "./tool.js";
+import { type Tool, defineTool } from "./tool.js";
 
 export function createListDirTool(paths: Paths): Tool {
   return defineTool({
@@ -15,9 +15,7 @@ export function createListDirTool(paths: Paths): Tool {
     requiresApproval: false,
     input: z.object({ path: z.string() }),
     output: z.object({
-      entries: z.array(
-        z.object({ name: z.string(), kind: z.enum(["file", "dir"]) }),
-      ),
+      entries: z.array(z.object({ name: z.string(), kind: z.enum(["file", "dir"]) })),
     }),
     async call({ path: rel }, { ctx }) {
       const abs = resolveInsideWorkspace(paths, ctx, rel);
@@ -25,9 +23,9 @@ export function createListDirTool(paths: Paths): Tool {
       const entries = await Promise.all(
         names.map(async (name) => ({
           name,
-          kind: ((await stat(path.join(abs, name))).isDirectory()
-            ? "dir"
-            : "file") as "dir" | "file",
+          kind: ((await stat(path.join(abs, name))).isDirectory() ? "dir" : "file") as
+            | "dir"
+            | "file",
         })),
       );
       return { entries };

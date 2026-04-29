@@ -10,10 +10,7 @@ export type LockedJob = {
   [key: string]: unknown;
 };
 
-export async function recoverStaleLockedJobs(
-  paths: Paths,
-  runtimeId: string,
-): Promise<string[]> {
+export async function recoverStaleLockedJobs(paths: Paths, runtimeId: string): Promise<string[]> {
   const lockedDir = paths.jobsDir(runtimeId, "locked");
   const failedDir = paths.jobsDir(runtimeId, "failed");
   await mkdir(lockedDir, { recursive: true });
@@ -41,10 +38,7 @@ export async function recoverStaleLockedJobs(
   return moved;
 }
 
-export async function markStaleRunningTasks(
-  paths: Paths,
-  runtimeId: string,
-): Promise<string[]> {
+export async function markStaleRunningTasks(paths: Paths, runtimeId: string): Promise<string[]> {
   const threadsRoot = paths.threadsRoot(runtimeId);
   await mkdir(threadsRoot, { recursive: true });
   const flipped: string[] = [];
@@ -107,10 +101,7 @@ export async function cleanupStaleDedupe(
   return cleaned;
 }
 
-export async function cleanupRecoveredTombstones(
-  paths: Paths,
-  runtimeId: string,
-): Promise<number> {
+export async function cleanupRecoveredTombstones(paths: Paths, runtimeId: string): Promise<number> {
   const dirs = ["pending", "locked", "done", "failed"] as const;
   let count = 0;
   for (const d of dirs) {

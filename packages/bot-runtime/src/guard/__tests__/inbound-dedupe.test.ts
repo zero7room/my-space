@@ -16,12 +16,8 @@ describe("inbound dedupe", () => {
 
   it("first call records event, second is detected as duplicate", async () => {
     const paths = createPaths(dataRoot);
-    expect(
-      await isDuplicateInboundEvent(paths, "rt-1", "feishu", "evt-1"),
-    ).toBe(false);
+    expect(await isDuplicateInboundEvent(paths, "rt-1", "feishu", "evt-1")).toBe(false);
     await recordInboundEvent(paths, "rt-1", "feishu", "evt-1", { foo: 1 });
-    expect(
-      await isDuplicateInboundEvent(paths, "rt-1", "feishu", "evt-1"),
-    ).toBe(true);
+    expect(await isDuplicateInboundEvent(paths, "rt-1", "feishu", "evt-1")).toBe(true);
   });
 });

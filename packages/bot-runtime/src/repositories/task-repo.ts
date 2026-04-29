@@ -1,20 +1,14 @@
 import { mkdir, readdir } from "node:fs/promises";
-import { readJson, writeJson } from "../storage/json-file.js";
-import { newId } from "../storage/ids.js";
-import type { Paths } from "../storage/paths.js";
 import { type Task, TaskSchema, type TaskStatus } from "../schema/task.js";
+import { newId } from "../storage/ids.js";
+import { readJson, writeJson } from "../storage/json-file.js";
+import type { Paths } from "../storage/paths.js";
 
 const LEGAL_TRANSITIONS: Record<TaskStatus, TaskStatus[]> = {
   draft: ["confirmed", "cancelled"],
   confirmed: ["queued", "cancelled"],
   queued: ["running", "cancelled"],
-  running: [
-    "awaiting_critical_node",
-    "blocked",
-    "changing",
-    "completed",
-    "failed",
-  ],
+  running: ["awaiting_critical_node", "blocked", "changing", "completed", "failed"],
   awaiting_critical_node: ["running", "cancelled"],
   blocked: ["running", "cancelled"],
   changing: ["queued", "cancelled"],
@@ -36,15 +30,8 @@ export type TaskRepo = {
   load(taskId: string): Promise<Task | null>;
   loadInThread(threadId: string, taskId: string): Promise<Task | null>;
   update(taskId: string, patch: Partial<Task>): Promise<Task>;
-  transitionStatus(
-    taskId: string,
-    next: TaskStatus,
-    extras?: Partial<Task>,
-  ): Promise<Task>;
-  listByThread(
-    threadId: string,
-    opts?: { status?: TaskStatus[] },
-  ): Promise<Task[]>;
+  transitionStatus(taskId: string, next: TaskStatus, extras?: Partial<Task>): Promise<Task>;
+  listByThread(threadId: string, opts?: { status?: TaskStatus[] }): Promise<Task[]>;
 };
 
 export function createTaskRepo(paths: Paths, runtimeId: string): TaskRepo {
@@ -118,9 +105,7 @@ export function createTaskRepo(paths: Paths, runtimeId: string): TaskRepo {
       if (!cur) throw new Error(`task ${taskId} not found`);
       const allowed = LEGAL_TRANSITIONS[cur.status] ?? [];
       if (!allowed.includes(next)) {
-        throw new Error(
-          `illegal transition: ${cur.status} -> ${next} for task ${taskId}`,
-        );
+        throw new Error(`illegal transition: ${cur.status} -> ${next} for task ${taskId}`);
       }
       return this.update(taskId, { status: next, ...extras });
     },

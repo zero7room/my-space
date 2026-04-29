@@ -1,7 +1,4 @@
-const SECRET_PATTERNS: RegExp[] = [
-  /\bBearer\s+[A-Za-z0-9._\-]{20,}\b/g,
-  /\b[A-Za-z0-9]{32,}\b/g,
-];
+const SECRET_PATTERNS: RegExp[] = [/\bBearer\s+[A-Za-z0-9._\-]{20,}\b/g, /\b[A-Za-z0-9]{32,}\b/g];
 
 const PII_PATTERNS: RegExp[] = [
   /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g,

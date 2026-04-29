@@ -33,19 +33,14 @@ describe("write_file", () => {
     )) as { bytesWritten: number };
     expect(out.bytesWritten).toBe(2);
     const ws = paths.workspace("rt-1", ctx().threadId, ctx().taskId);
-    expect(await readFile(path.join(ws, "deep/nested/file.txt"), "utf8")).toBe(
-      "hi",
-    );
+    expect(await readFile(path.join(ws, "deep/nested/file.txt"), "utf8")).toBe("hi");
   });
 
   it("rejects writes outside the workspace", async () => {
     const paths = createPaths(dataRoot);
     const tool = createWriteFileTool(paths);
     await expect(
-      tool.call(
-        { path: "../escape.txt", content: "x" },
-        { ctx: ctx() },
-      ),
+      tool.call({ path: "../escape.txt", content: "x" }, { ctx: ctx() }),
     ).rejects.toThrow(/outside workspace/);
   });
 });

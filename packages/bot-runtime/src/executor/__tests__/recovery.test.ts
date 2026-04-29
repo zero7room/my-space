@@ -2,8 +2,8 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { createEventsWriter } from "../events-writer.js";
 import { createPaths } from "../../storage/paths.js";
+import { createEventsWriter } from "../events-writer.js";
 import { detectInFlightToolCall } from "../recovery.js";
 
 describe("detectInFlightToolCall", () => {
@@ -24,9 +24,7 @@ describe("detectInFlightToolCall", () => {
       fencingToken: 1,
       at: "2026-04-28T00:00:00Z",
     });
-    expect(
-      await detectInFlightToolCall(paths, "rt-1", "th-1", "tk-1"),
-    ).toBeNull();
+    expect(await detectInFlightToolCall(paths, "rt-1", "th-1", "tk-1")).toBeNull();
   });
 
   it("returns the unmatched tool_call when not followed by tool_result", async () => {
@@ -57,8 +55,6 @@ describe("detectInFlightToolCall", () => {
       resultRef: "y",
       at: "2026-04-28T00:00:02Z",
     });
-    expect(
-      await detectInFlightToolCall(paths, "rt-1", "th-1", "tk-1"),
-    ).toBeNull();
+    expect(await detectInFlightToolCall(paths, "rt-1", "th-1", "tk-1")).toBeNull();
   });
 });

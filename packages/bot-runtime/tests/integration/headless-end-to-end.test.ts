@@ -2,9 +2,9 @@ import { mkdir, mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { createPaths } from "../../src/storage/paths.js";
 import { createStubLlmClient } from "../../src/llm/client.js";
 import { createHybridHost } from "../../src/runtime/hybrid-host.js";
+import { createPaths } from "../../src/storage/paths.js";
 
 describe("E2E: inbound → guard → draft → confirm → execute → artifact", () => {
   let dataRoot: string;

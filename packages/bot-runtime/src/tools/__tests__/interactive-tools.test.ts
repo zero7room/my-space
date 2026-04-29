@@ -15,10 +15,7 @@ describe("interactive tools", () => {
 
   it("ask_clarification returns InterruptSignal", async () => {
     const tool = createAskClarificationTool();
-    const out = await tool.call(
-      { question: "more info?" },
-      { ctx: ctx() },
-    );
+    const out = await tool.call({ question: "more info?" }, { ctx: ctx() });
     expect(out).toMatchObject({
       kind: "interrupt",
       reason: "ask_clarification",

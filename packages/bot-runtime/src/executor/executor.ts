@@ -30,9 +30,7 @@ export type RunExecutorResult =
   | { outcome: "awaiting_critical_node"; policyIds: string[] }
   | { outcome: "blocked"; reason: string };
 
-export async function runExecutor(
-  input: RunExecutorInput,
-): Promise<RunExecutorResult> {
+export async function runExecutor(input: RunExecutorInput): Promise<RunExecutorResult> {
   const task = await input.taskRepo.load(input.taskId);
   if (!task) throw new Error(`task ${input.taskId} not found`);
   if (task.status !== "queued" && task.status !== "running") {
@@ -45,12 +43,7 @@ export async function runExecutor(
     await input.taskRepo.transitionStatus(input.taskId, "running");
   }
   const fencingToken = 1; // master-issued via job; passed via dispatcher ctx
-  const writer = createEventsWriter(
-    input.paths,
-    input.runtimeId,
-    task.threadId,
-    task.id,
-  );
+  const writer = createEventsWriter(input.paths, input.runtimeId, task.threadId, task.id);
   await writer.write({
     kind: "executor_started",
     executorId: input.executorId,
@@ -76,13 +69,9 @@ export async function runExecutor(
   let lastSeenSignal = 0;
 
   for (let step = 0; step < input.maxSteps; step++) {
-    const ctl = await readControl(
-      input.paths,
-      input.runtimeId,
-      task.threadId,
-      task.id,
-      { lastSeen: lastSeenSignal },
-    );
+    const ctl = await readControl(input.paths, input.runtimeId, task.threadId, task.id, {
+      lastSeen: lastSeenSignal,
+    });
     if (ctl?.signal === "cancel") {
       await writer.write({
         kind: "executor_finished",

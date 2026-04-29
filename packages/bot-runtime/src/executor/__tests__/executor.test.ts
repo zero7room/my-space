@@ -2,13 +2,13 @@ import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { createStubLlmClient } from "../../llm/client.js";
 import { createJobQueue } from "../../repositories/job-queue.js";
 import { createPlanRepo } from "../../repositories/plan-repo.js";
 import { createTaskRepo } from "../../repositories/task-repo.js";
 import { createPaths } from "../../storage/paths.js";
 import { createDispatcher } from "../../tools/dispatcher.js";
 import { createWriteFileTool } from "../../tools/write-file.js";
-import { createStubLlmClient } from "../../llm/client.js";
 import { runExecutor } from "../executor.js";
 
 describe("Executor agent loop", () => {

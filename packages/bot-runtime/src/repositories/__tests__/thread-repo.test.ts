@@ -33,12 +33,8 @@ describe("ThreadRepo", () => {
     });
     const updated = await repo.update(t.id, { status: "working" });
     expect(updated.status).toBe("working");
-    expect(Date.parse(updated.updatedAt)).toBeGreaterThanOrEqual(
-      Date.parse(t.updatedAt),
-    );
-    await expect(
-      repo.update(t.id, { status: "weird" as never }),
-    ).rejects.toThrow();
+    expect(Date.parse(updated.updatedAt)).toBeGreaterThanOrEqual(Date.parse(t.updatedAt));
+    await expect(repo.update(t.id, { status: "weird" as never })).rejects.toThrow();
   });
 
   it("listAll enumerates all threads", async () => {

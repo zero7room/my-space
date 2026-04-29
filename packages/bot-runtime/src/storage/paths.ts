@@ -19,33 +19,18 @@ export type Paths = {
   taskDir(runtimeId: string, threadId: string, taskId: string): string;
   taskJson(runtimeId: string, threadId: string, taskId: string): string;
   taskPlan(runtimeId: string, threadId: string, taskId: string): string;
-  planRevision(
-    runtimeId: string,
-    threadId: string,
-    taskId: string,
-    revisionId: string,
-  ): string;
+  planRevision(runtimeId: string, threadId: string, taskId: string, revisionId: string): string;
   taskEvents(runtimeId: string, threadId: string, taskId: string): string;
   taskControl(runtimeId: string, threadId: string, taskId: string): string;
   taskContext(runtimeId: string, threadId: string, taskId: string): string;
   workspace(runtimeId: string, threadId: string, taskId: string): string;
   uploads(runtimeId: string, threadId: string, taskId: string): string;
   outputs(runtimeId: string, threadId: string, taskId: string): string;
-  outputsArchive(
-    runtimeId: string,
-    threadId: string,
-    taskId: string,
-    revisionId: string,
-  ): string;
+  outputsArchive(runtimeId: string, threadId: string, taskId: string, revisionId: string): string;
   jobsDir(runtimeId: string, status: JobStatus): string;
   jobFile(runtimeId: string, status: JobStatus, jobId: string): string;
   channelConfig(runtimeId: string, channelType: string): string;
-  binding(
-    runtimeId: string,
-    threadId: string,
-    channelType: string,
-    bindingId: string,
-  ): string;
+  binding(runtimeId: string, threadId: string, channelType: string, bindingId: string): string;
   chatClaim(runtimeId: string, channelType: string, externalChatId: string): string;
   webhookEvent(runtimeId: string, channelType: string, eventId: string): string;
   criticalNodePolicy(runtimeId: string, policyId: string): string;
@@ -56,10 +41,8 @@ export function createPaths(dataRoot: string): Paths {
   const instance = (rt: string) => join(dataRoot, "instances", rt);
   const state = (rt: string) => join(instance(rt), "state");
   const thread = (rt: string, th: string) => join(state(rt), "threads", th);
-  const task = (rt: string, th: string, tk: string) =>
-    join(thread(rt, th), "tasks", tk);
-  const userData = (rt: string, th: string, tk: string) =>
-    join(task(rt, th, tk), "user-data");
+  const task = (rt: string, th: string, tk: string) => join(thread(rt, th), "tasks", tk);
+  const userData = (rt: string, th: string, tk: string) => join(task(rt, th, tk), "user-data");
 
   return {
     dataRoot,
@@ -78,26 +61,20 @@ export function createPaths(dataRoot: string): Paths {
     taskDir: task,
     taskJson: (rt, th, tk) => join(task(rt, th, tk), "task.json"),
     taskPlan: (rt, th, tk) => join(task(rt, th, tk), "plan.json"),
-    planRevision: (rt, th, tk, rv) =>
-      join(task(rt, th, tk), "plan-revisions", `${rv}.json`),
+    planRevision: (rt, th, tk, rv) => join(task(rt, th, tk), "plan-revisions", `${rv}.json`),
     taskEvents: (rt, th, tk) => join(task(rt, th, tk), "events.jsonl"),
     taskControl: (rt, th, tk) => join(task(rt, th, tk), "control.json"),
     taskContext: (rt, th, tk) => join(task(rt, th, tk), "context"),
     workspace: (rt, th, tk) => join(userData(rt, th, tk), "workspace"),
     uploads: (rt, th, tk) => join(userData(rt, th, tk), "uploads"),
     outputs: (rt, th, tk) => join(userData(rt, th, tk), "outputs"),
-    outputsArchive: (rt, th, tk, rv) =>
-      join(userData(rt, th, tk), "outputs", "_archive", rv),
+    outputsArchive: (rt, th, tk, rv) => join(userData(rt, th, tk), "outputs", "_archive", rv),
     jobsDir: (rt, status) => join(state(rt), "jobs", status),
-    jobFile: (rt, status, jid) =>
-      join(state(rt), "jobs", status, `${jid}.json`),
+    jobFile: (rt, status, jid) => join(state(rt), "jobs", status, `${jid}.json`),
     channelConfig: (rt, ct) => join(state(rt), "channels", `${ct}.json`),
-    binding: (rt, th, ct, bid) =>
-      join(state(rt), "bindings", th, ct, bid, "active.json"),
+    binding: (rt, th, ct, bid) => join(state(rt), "bindings", th, ct, bid, "active.json"),
     chatClaim: (rt, ct, ec) => join(state(rt), "chat-claims", ct, ec),
-    webhookEvent: (rt, ct, eid) =>
-      join(state(rt), "webhooks", ct, `${eid}.json`),
-    criticalNodePolicy: (rt, pid) =>
-      join(state(rt), "critical-node-policies", `${pid}.json`),
+    webhookEvent: (rt, ct, eid) => join(state(rt), "webhooks", ct, `${eid}.json`),
+    criticalNodePolicy: (rt, pid) => join(state(rt), "critical-node-policies", `${pid}.json`),
   };
 }

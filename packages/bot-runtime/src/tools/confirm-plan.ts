@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { PlanRepo } from "../repositories/plan-repo.js";
-import { defineTool, type Tool } from "./tool.js";
+import { type Tool, defineTool } from "./tool.js";
 
 export function createConfirmPlanTool(deps: { planRepo: PlanRepo }): Tool {
   return defineTool({

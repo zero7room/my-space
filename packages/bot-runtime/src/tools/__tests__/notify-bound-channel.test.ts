@@ -15,10 +15,7 @@ describe("notify_bound_channel (Plan 1 stub)", () => {
   it("requires explicit target", async () => {
     const tool = createNotifyBoundChannelTool();
     await expect(
-      tool.call(
-        { message: "hi", importance: "info" } as never,
-        { ctx: ctx() },
-      ),
+      tool.call({ message: "hi", importance: "info" } as never, { ctx: ctx() }),
     ).rejects.toThrow();
   });
 

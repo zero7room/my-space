@@ -1,13 +1,7 @@
 import { z } from "zod";
 import { ThreadIdSchema } from "./thread.js";
 
-export const ProviderSchema = z.enum([
-  "feishu",
-  "slack",
-  "wecom",
-  "email",
-  "custom",
-]);
+export const ProviderSchema = z.enum(["feishu", "slack", "wecom", "email", "custom"]);
 export type Provider = z.infer<typeof ProviderSchema>;
 
 export const ChannelConfigSchema = z.object({

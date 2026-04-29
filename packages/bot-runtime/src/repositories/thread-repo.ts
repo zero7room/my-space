@@ -1,8 +1,8 @@
 import { mkdir, readdir } from "node:fs/promises";
-import { readJson, writeJson } from "../storage/json-file.js";
-import { newId } from "../storage/ids.js";
-import type { Paths } from "../storage/paths.js";
 import { type Thread, ThreadSchema } from "../schema/thread.js";
+import { newId } from "../storage/ids.js";
+import { readJson, writeJson } from "../storage/json-file.js";
+import type { Paths } from "../storage/paths.js";
 
 export type CreateThreadInput = {
   title: string;

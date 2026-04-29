@@ -3,7 +3,7 @@ import path from "node:path";
 import { z } from "zod";
 import type { Paths } from "../storage/paths.js";
 import { resolveInsideWorkspace } from "./_workspace-resolver.js";
-import { defineTool, type Tool } from "./tool.js";
+import { type Tool, defineTool } from "./tool.js";
 
 export function createWriteFileTool(paths: Paths): Tool {
   return defineTool({

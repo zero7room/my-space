@@ -20,11 +20,7 @@ export async function recoverOnBoot(
 ): Promise<RecoverOnBootSummary> {
   const staleLockedJobs = await recoverStaleLockedJobs(paths, runtimeId);
   const staleRunningTasks = await markStaleRunningTasks(paths, runtimeId);
-  const cleanedDedupeKeys = await cleanupStaleDedupe(
-    paths,
-    runtimeId,
-    opts.dedupeRetentionDays,
-  );
+  const cleanedDedupeKeys = await cleanupStaleDedupe(paths, runtimeId, opts.dedupeRetentionDays);
   const cleanedTombstones = await cleanupRecoveredTombstones(paths, runtimeId);
   return {
     staleLockedJobs,

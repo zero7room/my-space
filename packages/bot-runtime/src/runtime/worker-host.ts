@@ -1,13 +1,13 @@
-import { acquireInstanceLock, type ReleaseLock } from "../storage/lock.js";
 import { recoverOnBoot } from "../executor/recovery-on-boot.js";
-import { createJobQueue, type JobQueue } from "../repositories/job-queue.js";
-import { createPlanRepo, type PlanRepo } from "../repositories/plan-repo.js";
-import { createTaskRepo, type TaskRepo } from "../repositories/task-repo.js";
-import { createPaths, type Paths } from "../storage/paths.js";
-import { createDispatcher, type Dispatcher } from "../tools/dispatcher.js";
-import { createDefaultToolRegistry } from "../tools/registry.js";
-import { runWorkerPoolOnce, type WorkerPoolOnceInput } from "../executor/worker-pool.js";
+import { type WorkerPoolOnceInput, runWorkerPoolOnce } from "../executor/worker-pool.js";
 import type { LlmClient } from "../llm/client.js";
+import { type JobQueue, createJobQueue } from "../repositories/job-queue.js";
+import { type PlanRepo, createPlanRepo } from "../repositories/plan-repo.js";
+import { type TaskRepo, createTaskRepo } from "../repositories/task-repo.js";
+import { type ReleaseLock, acquireInstanceLock } from "../storage/lock.js";
+import { type Paths, createPaths } from "../storage/paths.js";
+import { type Dispatcher, createDispatcher } from "../tools/dispatcher.js";
+import { createDefaultToolRegistry } from "../tools/registry.js";
 
 export type CreateWorkerHostInput = {
   paths: Paths;
@@ -28,9 +28,7 @@ export type WorkerHost = {
   close(): Promise<void>;
 };
 
-export async function createWorkerHost(
-  input: CreateWorkerHostInput,
-): Promise<WorkerHost> {
+export async function createWorkerHost(input: CreateWorkerHostInput): Promise<WorkerHost> {
   const release: ReleaseLock =
     input.existingLock?.release ??
     (await acquireInstanceLock(input.paths, input.runtimeId, { role: "worker" }));

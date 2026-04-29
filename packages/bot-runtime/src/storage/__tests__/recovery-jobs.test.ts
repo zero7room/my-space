@@ -33,12 +33,8 @@ describe("recovery — stale locked jobs", () => {
 
     const moved = await recoverStaleLockedJobs(paths, "rt-1");
     expect(moved).toContain("job-expired");
-    expect(await readdir(paths.jobsDir("rt-1", "locked"))).not.toContain(
-      "job-expired.json",
-    );
-    expect(await readdir(paths.jobsDir("rt-1", "failed"))).toContain(
-      "job-expired.json",
-    );
+    expect(await readdir(paths.jobsDir("rt-1", "locked"))).not.toContain("job-expired.json");
+    expect(await readdir(paths.jobsDir("rt-1", "failed"))).toContain("job-expired.json");
   });
 
   it("keeps non-expired locked jobs in place", async () => {
@@ -59,8 +55,6 @@ describe("recovery — stale locked jobs", () => {
 
     const moved = await recoverStaleLockedJobs(paths, "rt-1");
     expect(moved).toEqual([]);
-    expect(await readdir(paths.jobsDir("rt-1", "locked"))).toContain(
-      "job-fresh.json",
-    );
+    expect(await readdir(paths.jobsDir("rt-1", "locked"))).toContain("job-fresh.json");
   });
 });

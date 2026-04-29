@@ -22,16 +22,10 @@ export async function handleConfirmation(
   const task = await input.taskRepo.load(input.taskId);
   if (!task) throw new Error(`task ${input.taskId} not found`);
   if (task.ownerUserId !== input.fromUserId) {
-    throw new Error(
-      `confirmation rejected: fromUserId !== owner (${task.ownerUserId})`,
-    );
+    throw new Error(`confirmation rejected: fromUserId !== owner (${task.ownerUserId})`);
   }
 
-  if (
-    task.status === "queued" ||
-    task.status === "running" ||
-    task.status === "completed"
-  ) {
+  if (task.status === "queued" || task.status === "running" || task.status === "completed") {
     return { status: "already_dispatched" };
   }
 
@@ -39,11 +33,7 @@ export async function handleConfirmation(
     confirmedByUserId: input.fromUserId,
     planId: input.planId,
   });
-  const activatedPlan = await input.planRepo.activate(
-    input.planId,
-    task.threadId,
-    task.id,
-  );
+  const activatedPlan = await input.planRepo.activate(input.planId, task.threadId, task.id);
   const queued = await input.taskRepo.transitionStatus(input.taskId, "queued");
   void queued;
 

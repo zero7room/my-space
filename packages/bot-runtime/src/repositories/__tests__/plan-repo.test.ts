@@ -55,9 +55,7 @@ describe("PlanRepo", () => {
     });
 
     expect(newRev.status).toBe("active");
-    const archived = await readdir(
-      paths.outputsArchive("rt-1", ids.th, ids.tk, newRev.id),
-    );
+    const archived = await readdir(paths.outputsArchive("rt-1", ids.th, ids.tk, newRev.id));
     expect(archived).toContain("draft.md");
   });
 });

@@ -1,10 +1,7 @@
 import { mkdir, readdir } from "node:fs/promises";
+import { type CriticalNodePolicy, CriticalNodePolicySchema } from "../schema/critical-node.js";
 import { readJson, writeJson } from "../storage/json-file.js";
 import type { Paths } from "../storage/paths.js";
-import {
-  type CriticalNodePolicy,
-  CriticalNodePolicySchema,
-} from "../schema/critical-node.js";
 
 const SCOPE_ORDER: Record<CriticalNodePolicy["scope"], number> = {
   global: 0,
@@ -27,10 +24,7 @@ export function createCriticalNodePolicyRepo(
   return {
     async save(policy) {
       const validated = CriticalNodePolicySchema.parse(policy);
-      await writeJson(
-        paths.criticalNodePolicy(runtimeId, validated.id),
-        validated,
-      );
+      await writeJson(paths.criticalNodePolicy(runtimeId, validated.id), validated);
     },
     async load(policyId) {
       const raw = await readJson(paths.criticalNodePolicy(runtimeId, policyId));

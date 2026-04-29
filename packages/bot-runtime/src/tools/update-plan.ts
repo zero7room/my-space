@@ -1,9 +1,9 @@
 import { z } from "zod";
-import { writeJson } from "../storage/json-file.js";
 import type { PlanRepo } from "../repositories/plan-repo.js";
 import { PlanSchema, PlanStepSchema } from "../schema/plan.js";
+import { writeJson } from "../storage/json-file.js";
 import type { Paths } from "../storage/paths.js";
-import { defineTool, type Tool } from "./tool.js";
+import { type Tool, defineTool } from "./tool.js";
 
 /**
  * Replaces the steps and objective of a draft plan in-place, preserving the plan id.
@@ -51,10 +51,7 @@ export function createUpdatePlanTool(deps: {
       // Write through paths if injected; else fallback to repo's createDraftPlan
       // overwriting the same path is acceptable since loadPlan resolves the same file.
       if (deps.paths && deps.runtimeId) {
-        await writeJson(
-          deps.paths.taskPlan(deps.runtimeId, threadId, taskId),
-          next,
-        );
+        await writeJson(deps.paths.taskPlan(deps.runtimeId, threadId, taskId), next);
       } else {
         // Fallback: re-create as draft to overwrite plan.json. Loses status/revisionIds
         // continuity in the unlikely case where caller didn't pass paths/runtimeId.

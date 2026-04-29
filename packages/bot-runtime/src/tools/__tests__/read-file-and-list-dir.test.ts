@@ -45,12 +45,12 @@ describe("read_file and list_dir", () => {
   it("read_file rejects absolute paths and traversal", async () => {
     const paths = await setupWorkspace();
     const tool = createReadFileTool(paths);
-    await expect(
-      tool.call({ path: "/etc/passwd" }, { ctx: ctx() }),
-    ).rejects.toThrow(/outside workspace/);
-    await expect(
-      tool.call({ path: "../../escape" }, { ctx: ctx() }),
-    ).rejects.toThrow(/outside workspace/);
+    await expect(tool.call({ path: "/etc/passwd" }, { ctx: ctx() })).rejects.toThrow(
+      /outside workspace/,
+    );
+    await expect(tool.call({ path: "../../escape" }, { ctx: ctx() })).rejects.toThrow(
+      /outside workspace/,
+    );
   });
 
   it("list_dir returns entries", async () => {

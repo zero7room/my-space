@@ -1,9 +1,9 @@
-import { acquireInstanceLock, type ReleaseLock } from "../storage/lock.js";
 import { recoverOnBoot } from "../executor/recovery-on-boot.js";
 import type { LlmClient } from "../llm/client.js";
+import { type ReleaseLock, acquireInstanceLock } from "../storage/lock.js";
 import type { Paths } from "../storage/paths.js";
-import { createMasterHost, type MasterHost } from "./master-host.js";
-import { createWorkerHost, type WorkerHost } from "./worker-host.js";
+import { type MasterHost, createMasterHost } from "./master-host.js";
+import { type WorkerHost, createWorkerHost } from "./worker-host.js";
 
 export type CreateHybridHostInput = {
   paths: Paths;
@@ -22,9 +22,7 @@ export type HybridHost = {
   close(): Promise<void>;
 };
 
-export async function createHybridHost(
-  input: CreateHybridHostInput,
-): Promise<HybridHost> {
+export async function createHybridHost(input: CreateHybridHostInput): Promise<HybridHost> {
   const release: ReleaseLock = await acquireInstanceLock(input.paths, input.runtimeId, {
     role: "hybrid",
   });

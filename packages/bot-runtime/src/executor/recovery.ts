@@ -1,9 +1,6 @@
+import { type ExecutorEvent, ExecutorEventSchema } from "../schema/events.js";
 import { readJsonl } from "../storage/jsonl.js";
 import type { Paths } from "../storage/paths.js";
-import {
-  type ExecutorEvent,
-  ExecutorEventSchema,
-} from "../schema/events.js";
 
 export type InFlightToolCall = {
   toolName: string;
@@ -17,9 +14,9 @@ export async function detectInFlightToolCall(
   threadId: string,
   taskId: string,
 ): Promise<InFlightToolCall | null> {
-  const events = (
-    await readJsonl<unknown>(paths.taskEvents(runtimeId, threadId, taskId))
-  ).map((e) => ExecutorEventSchema.parse(e));
+  const events = (await readJsonl<unknown>(paths.taskEvents(runtimeId, threadId, taskId))).map(
+    (e) => ExecutorEventSchema.parse(e),
+  );
   let lastCall: ExecutorEvent | null = null;
   for (const e of events) {
     if (e.kind === "tool_call") lastCall = e;

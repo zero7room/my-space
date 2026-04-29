@@ -16,10 +16,7 @@ export type TranscriptRepo = {
   read(threadId: string): Promise<TranscriptEntry[]>;
 };
 
-export function createTranscriptRepo(
-  paths: Paths,
-  runtimeId: string,
-): TranscriptRepo {
+export function createTranscriptRepo(paths: Paths, runtimeId: string): TranscriptRepo {
   return {
     append(threadId, entry) {
       return appendJsonl(paths.transcript(runtimeId, threadId), sanitize(entry));

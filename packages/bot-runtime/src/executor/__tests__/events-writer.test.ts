@@ -37,8 +37,6 @@ describe("EventsWriter", () => {
   it("rejects events failing schema", async () => {
     const paths = createPaths(dataRoot);
     const w = createEventsWriter(paths, "rt-1", "th-1", "tk-1");
-    await expect(
-      w.write({ kind: "wat", at: "2026-04-28T00:00:00Z" } as never),
-    ).rejects.toThrow();
+    await expect(w.write({ kind: "wat", at: "2026-04-28T00:00:00Z" } as never)).rejects.toThrow();
   });
 });

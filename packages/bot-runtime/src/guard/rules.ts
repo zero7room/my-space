@@ -6,13 +6,7 @@ export type RuleInput = {
   mentionsBot: boolean;
   replyToBotMessage: boolean;
   slashCommand: "confirm" | "cancel" | "status" | null;
-  threadStatus:
-    | "chatting"
-    | "planning"
-    | "waiting_confirmation"
-    | "working"
-    | "blocked"
-    | "idle";
+  threadStatus: "chatting" | "planning" | "waiting_confirmation" | "working" | "blocked" | "idle";
 };
 
 export type RuleEvaluation = {

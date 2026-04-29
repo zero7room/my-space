@@ -33,9 +33,7 @@ describe("ChannelBindingRepo", () => {
   it("claimChat prevents same external chat being bound twice", async () => {
     const repo = createChannelBindingRepo(createPaths(dataRoot), "rt-1");
     await repo.claimChat("feishu", "oc_xxx", th);
-    await expect(
-      repo.claimChat("feishu", "oc_xxx", "th_other"),
-    ).rejects.toThrow(/already claimed/);
+    await expect(repo.claimChat("feishu", "oc_xxx", "th_other")).rejects.toThrow(/already claimed/);
   });
 
   it("releaseChat removes the claim file", async () => {

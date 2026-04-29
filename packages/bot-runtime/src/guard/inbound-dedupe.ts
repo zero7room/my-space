@@ -1,4 +1,4 @@
-import { writeJson, readJson } from "../storage/json-file.js";
+import { readJson, writeJson } from "../storage/json-file.js";
 import type { Paths } from "../storage/paths.js";
 
 export async function isDuplicateInboundEvent(

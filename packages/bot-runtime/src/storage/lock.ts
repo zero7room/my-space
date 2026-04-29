@@ -51,10 +51,7 @@ export async function readRuntimeInfo(
   return readJson<RuntimeInfo>(paths.runtimeInfo(runtimeId));
 }
 
-export async function touchRuntimeInfo(
-  paths: Paths,
-  runtimeId: string,
-): Promise<void> {
+export async function touchRuntimeInfo(paths: Paths, runtimeId: string): Promise<void> {
   const cur = await readRuntimeInfo(paths, runtimeId);
   if (!cur) throw new Error(`runtime-info missing for ${runtimeId}`);
   cur.lastSeenAt = new Date().toISOString();

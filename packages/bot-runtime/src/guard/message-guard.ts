@@ -2,7 +2,7 @@ import type { LlmClient } from "../llm/client.js";
 import type { GuardIntent, GuardSource } from "../schema/guard-decision.js";
 import { fallbackClassify } from "./fallback.js";
 import { classifyIntentWithLlm } from "./llm-classifier.js";
-import { evaluateRules, type RuleInput } from "./rules.js";
+import { type RuleInput, evaluateRules } from "./rules.js";
 
 export type ClassifyInput = RuleInput & {
   messageText: string;

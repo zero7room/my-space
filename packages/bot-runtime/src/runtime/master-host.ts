@@ -1,16 +1,24 @@
-import { acquireInstanceLock, type ReleaseLock } from "../storage/lock.js";
-import { createFencingTokenIssuer, type FencingTokenIssuer } from "../storage/fencing.js";
-import type { Paths } from "../storage/paths.js";
 import { recoverOnBoot } from "../executor/recovery-on-boot.js";
-import { createGuardDecisionRepo, type GuardDecisionRepo } from "../repositories/guard-decision-repo.js";
-import { createJobQueue, type JobQueue } from "../repositories/job-queue.js";
-import { createPlanRepo, type PlanRepo } from "../repositories/plan-repo.js";
-import { createTaskRepo, type TaskRepo } from "../repositories/task-repo.js";
-import { createThreadRepo, type ThreadRepo } from "../repositories/thread-repo.js";
-import { createTranscriptRepo, type TranscriptRepo } from "../repositories/transcript-repo.js";
+import { type MessageGuard, createMessageGuard } from "../guard/message-guard.js";
 import type { LlmClient } from "../llm/client.js";
-import { createMessageGuard, type MessageGuard } from "../guard/message-guard.js";
-import { createThreadLoop, type InboundEvent, type ThreadLoop, type ThreadLoopResult } from "../thread-loop/thread-loop.js";
+import {
+  type GuardDecisionRepo,
+  createGuardDecisionRepo,
+} from "../repositories/guard-decision-repo.js";
+import { type JobQueue, createJobQueue } from "../repositories/job-queue.js";
+import { type PlanRepo, createPlanRepo } from "../repositories/plan-repo.js";
+import { type TaskRepo, createTaskRepo } from "../repositories/task-repo.js";
+import { type ThreadRepo, createThreadRepo } from "../repositories/thread-repo.js";
+import { type TranscriptRepo, createTranscriptRepo } from "../repositories/transcript-repo.js";
+import { type FencingTokenIssuer, createFencingTokenIssuer } from "../storage/fencing.js";
+import { type ReleaseLock, acquireInstanceLock } from "../storage/lock.js";
+import type { Paths } from "../storage/paths.js";
+import {
+  type InboundEvent,
+  type ThreadLoop,
+  type ThreadLoopResult,
+  createThreadLoop,
+} from "../thread-loop/thread-loop.js";
 
 export type CreateMasterHostInput = {
   paths: Paths;
@@ -48,9 +56,7 @@ export type IngestInboundInput = {
   at: string;
 };
 
-export async function createMasterHost(
-  input: CreateMasterHostInput,
-): Promise<MasterHost> {
+export async function createMasterHost(input: CreateMasterHostInput): Promise<MasterHost> {
   const release: ReleaseLock =
     input.existingLock?.release ??
     (await acquireInstanceLock(input.paths, input.runtimeId, { role: "master" }));
@@ -117,15 +123,11 @@ export async function createMasterHost(
       // inject the pending IDs as targetTaskId/targetPlanId so the thread-loop can
       // dispatch the confirmation even when the guard or LLM does not return them.
       const effectiveTargetTaskId =
-        decision.targetTaskId ??
-        (req.slashCommand === "confirm" ? thread?.draftTaskId : undefined);
+        decision.targetTaskId ?? (req.slashCommand === "confirm" ? thread?.draftTaskId : undefined);
       const effectiveTargetPlanId =
-        decision.targetPlanId ??
-        (req.slashCommand === "confirm" ? thread?.draftPlanId : undefined);
+        decision.targetPlanId ?? (req.slashCommand === "confirm" ? thread?.draftPlanId : undefined);
       const effectiveIntent =
-        req.slashCommand === "confirm" && effectiveTargetTaskId
-          ? "confirm_task"
-          : decision.intent;
+        req.slashCommand === "confirm" && effectiveTargetTaskId ? "confirm_task" : decision.intent;
 
       const loop = getOrCreateThreadLoop(req.threadId);
       return loop.handleInbound({

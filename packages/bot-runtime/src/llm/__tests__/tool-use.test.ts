@@ -26,9 +26,7 @@ describe("anthropic adapter — tool_use response", () => {
     const out = await client.complete({
       system: "x",
       messages: [{ role: "user", content: "y" }],
-      tools: [
-        { name: "write_file", description: "x", inputSchemaJson: {} },
-      ],
+      tools: [{ name: "write_file", description: "x", inputSchemaJson: {} }],
     });
     expect(out).toEqual({
       kind: "tool_call",

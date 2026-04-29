@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { TaskRepo } from "../repositories/task-repo.js";
-import { defineTool, type Tool } from "./tool.js";
+import { type Tool, defineTool } from "./tool.js";
 
 export function createConfirmTaskTool(deps: { taskRepo: TaskRepo }): Tool {
   return defineTool({
@@ -19,9 +19,7 @@ export function createConfirmTaskTool(deps: { taskRepo: TaskRepo }): Tool {
       const t = await deps.taskRepo.load(taskId);
       if (!t) throw new Error(`task ${taskId} not found`);
       if (t.ownerUserId !== fromUserId) {
-        throw new Error(
-          `confirm_task rejected: fromUserId !== task owner (${t.ownerUserId})`,
-        );
+        throw new Error(`confirm_task rejected: fromUserId !== task owner (${t.ownerUserId})`);
       }
       const next = await deps.taskRepo.transitionStatus(taskId, "confirmed", {
         confirmedByUserId: fromUserId,

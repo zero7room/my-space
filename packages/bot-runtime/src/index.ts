@@ -1,9 +1,9 @@
-import { createPaths } from "./storage/paths.js";
-import { createAnthropicLlmClient } from "./llm/anthropic.js";
 import { parseRuntimeConfig } from "./config/env.js";
+import { createAnthropicLlmClient } from "./llm/anthropic.js";
+import { createHybridHost } from "./runtime/hybrid-host.js";
 import { createMasterHost } from "./runtime/master-host.js";
 import { createWorkerHost } from "./runtime/worker-host.js";
-import { createHybridHost } from "./runtime/hybrid-host.js";
+import { createPaths } from "./storage/paths.js";
 
 export const VERSION = "0.0.0";
 

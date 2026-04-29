@@ -2,8 +2,8 @@ import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { acquireInstanceLock } from "../lock.js";
 import { createFencingTokenIssuer } from "../fencing.js";
+import { acquireInstanceLock } from "../lock.js";
 import { createPaths } from "../paths.js";
 
 describe("fencing", () => {

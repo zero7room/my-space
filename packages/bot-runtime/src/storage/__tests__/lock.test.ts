@@ -2,7 +2,12 @@ import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { acquireInstanceLock, readRuntimeInfo, releaseInstanceLock, touchRuntimeInfo } from "../lock.js";
+import {
+  acquireInstanceLock,
+  readRuntimeInfo,
+  releaseInstanceLock,
+  touchRuntimeInfo,
+} from "../lock.js";
 import { createPaths } from "../paths.js";
 
 describe("lock", () => {
@@ -28,9 +33,7 @@ describe("lock", () => {
     const paths = createPaths(dataRoot);
     await mkdir(paths.instanceRoot("rt-1"), { recursive: true });
     const release = await acquireInstanceLock(paths, "rt-1", { role: "hybrid" });
-    await expect(
-      acquireInstanceLock(paths, "rt-1", { role: "hybrid" })
-    ).rejects.toThrow();
+    await expect(acquireInstanceLock(paths, "rt-1", { role: "hybrid" })).rejects.toThrow();
     await release();
   });
 

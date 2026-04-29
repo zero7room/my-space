@@ -60,7 +60,11 @@ describe("WorkerPool runWorkerPoolOnce", () => {
       planRepo,
       jobs,
       dispatcher: createDispatcher({ tools: [], policies: [] }),
-      llm: { async complete() { return { kind: "text", text: "ok" }; } },
+      llm: {
+        async complete() {
+          return { kind: "text", text: "ok" };
+        },
+      },
       systemPrompt: "x",
       maxSteps: 3,
       leaseMs: 60_000,
@@ -83,7 +87,11 @@ describe("WorkerPool runWorkerPoolOnce", () => {
       planRepo,
       jobs,
       dispatcher: createDispatcher({ tools: [], policies: [] }),
-      llm: { async complete() { return { kind: "text", text: "ok" }; } },
+      llm: {
+        async complete() {
+          return { kind: "text", text: "ok" };
+        },
+      },
       systemPrompt: "x",
       maxSteps: 3,
       leaseMs: 60_000,

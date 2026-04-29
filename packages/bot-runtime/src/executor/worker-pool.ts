@@ -5,7 +5,7 @@ import type { TaskRepo } from "../repositories/task-repo.js";
 import { newId } from "../storage/ids.js";
 import type { Paths } from "../storage/paths.js";
 import type { Dispatcher } from "../tools/dispatcher.js";
-import { runExecutor, type RunExecutorResult } from "./executor.js";
+import { type RunExecutorResult, runExecutor } from "./executor.js";
 
 export type WorkerPoolOnceInput = {
   paths: Paths;

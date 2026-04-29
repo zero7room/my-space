@@ -2,13 +2,13 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { createStubLlmClient } from "../../llm/client.js";
 import { createGuardDecisionRepo } from "../../repositories/guard-decision-repo.js";
 import { createJobQueue } from "../../repositories/job-queue.js";
 import { createPlanRepo } from "../../repositories/plan-repo.js";
 import { createTaskRepo } from "../../repositories/task-repo.js";
 import { createThreadRepo } from "../../repositories/thread-repo.js";
 import { createTranscriptRepo } from "../../repositories/transcript-repo.js";
-import { createStubLlmClient } from "../../llm/client.js";
 import { createPaths } from "../../storage/paths.js";
 import { createThreadLoop } from "../thread-loop.js";
 

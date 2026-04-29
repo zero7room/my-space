@@ -23,10 +23,7 @@ export async function readJsonl<T = unknown>(file: string): Promise<T[]> {
   return out;
 }
 
-export async function tailJsonl<T = unknown>(
-  file: string,
-  n: number,
-): Promise<T[]> {
+export async function tailJsonl<T = unknown>(file: string, n: number): Promise<T[]> {
   const all = await readJsonl<T>(file);
   return all.slice(Math.max(0, all.length - n));
 }
