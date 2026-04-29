@@ -11,8 +11,10 @@ Three required eval paths from Spec 12.3:
 Stub mode (no API key needed; deterministic baseline):
 
     pnpm --filter @ai-employee/bot-runtime eval -- --eval message-guard
+    pnpm --filter @ai-employee/bot-runtime eval -- --eval task-confirmation
+    pnpm --filter @ai-employee/bot-runtime eval -- --eval plan-revision
 
-Live mode (real Anthropic LLM):
+Live mode (real Anthropic LLM; `message-guard` only in v1; others stub-only):
 
     ANTHROPIC_API_KEY=sk-... pnpm --filter @ai-employee/bot-runtime eval -- --eval message-guard
 
