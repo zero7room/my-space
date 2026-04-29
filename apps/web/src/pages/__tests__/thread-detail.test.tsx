@@ -8,10 +8,13 @@ vi.mock("../../api/client.js", () => ({
   createApiClient: () => ({
     getThread: async () => ({ id: "th_1", title: "Project", status: "chatting" }),
     getTasks: async () => [{ id: "tk_1", title: "Task A", status: "running" }],
+    getTask: async () => null,
     getTranscript: async () => [],
     postMessage: async () => ({ kind: "noop" }),
     getPlan: async () => null,
     getArtifacts: async () => [],
+    confirmTask: async () => ({ kind: "noop" }),
+    cancelTask: async () => ({ kind: "noop" }),
   }),
 }));
 

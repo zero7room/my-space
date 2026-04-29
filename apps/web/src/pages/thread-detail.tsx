@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useAppContext } from "../app-context.js";
 import { ConversationPanel } from "../components/conversation-panel.js";
+import { TaskPlanPanel } from "../components/task-plan-panel.js";
 import { useEventStream } from "../hooks/use-event-stream.js";
 
 type Thread = { id: string; title: string; status: string };
@@ -50,7 +51,7 @@ export function ThreadDetail() {
             </li>
           ))}
         </ul>
-        <div>(Plan panel — Task 20)</div>
+        {tasks[0] && id && <TaskPlanPanel taskId={tasks[0].id} threadId={id} />}
       </div>
       <div className="panel right">
         <h4>Artifacts</h4>
