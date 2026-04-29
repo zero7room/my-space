@@ -18,6 +18,7 @@ export type CreateMasterHostInput = {
   guardLlm: LlmClient;
   draftLlm: LlmClient;
   systemPrompt: string;
+  existingLock?: { release: ReleaseLock; skipBoot: boolean };
 };
 
 export type MasterHost = {
@@ -50,10 +51,12 @@ export type IngestInboundInput = {
 export async function createMasterHost(
   input: CreateMasterHostInput,
 ): Promise<MasterHost> {
-  const release: ReleaseLock = await acquireInstanceLock(input.paths, input.runtimeId, {
-    role: "master",
-  });
-  await recoverOnBoot(input.paths, input.runtimeId, { dedupeRetentionDays: 30 });
+  const release: ReleaseLock =
+    input.existingLock?.release ??
+    (await acquireInstanceLock(input.paths, input.runtimeId, { role: "master" }));
+  if (!input.existingLock?.skipBoot) {
+    await recoverOnBoot(input.paths, input.runtimeId, { dedupeRetentionDays: 30 });
+  }
   const fencing = await createFencingTokenIssuer(input.paths, input.runtimeId);
 
   const threadRepo = createThreadRepo(input.paths, input.runtimeId);
@@ -109,6 +112,21 @@ export async function createMasterHost(
         pendingTaskId: thread?.draftTaskId,
         pendingPlanId: thread?.draftPlanId,
       });
+
+      // When a /confirm slash command is present and the thread has a pending draft,
+      // inject the pending IDs as targetTaskId/targetPlanId so the thread-loop can
+      // dispatch the confirmation even when the guard or LLM does not return them.
+      const effectiveTargetTaskId =
+        decision.targetTaskId ??
+        (req.slashCommand === "confirm" ? thread?.draftTaskId : undefined);
+      const effectiveTargetPlanId =
+        decision.targetPlanId ??
+        (req.slashCommand === "confirm" ? thread?.draftPlanId : undefined);
+      const effectiveIntent =
+        req.slashCommand === "confirm" && effectiveTargetTaskId
+          ? "confirm_task"
+          : decision.intent;
+
       const loop = getOrCreateThreadLoop(req.threadId);
       return loop.handleInbound({
         messageId: req.messageId,
@@ -116,20 +134,20 @@ export async function createMasterHost(
         source: req.source,
         text: req.messageText,
         decision: {
-          intent: decision.intent,
-          ...(decision.targetTaskId !== undefined && { targetTaskId: decision.targetTaskId }),
-          ...(decision.targetPlanId !== undefined && { targetPlanId: decision.targetPlanId }),
+          intent: effectiveIntent,
+          ...(effectiveTargetTaskId !== undefined && { targetTaskId: effectiveTargetTaskId }),
+          ...(effectiveTargetPlanId !== undefined && { targetPlanId: effectiveTargetPlanId }),
           shortCircuited: decision.shortCircuited,
           ruleHits: decision.ruleHits,
           confidence: decision.confidence,
-          requiresUserConfirmation: decision.intent === "new_task",
+          requiresUserConfirmation: effectiveIntent === "new_task",
           reason: decision.reason,
         },
         at: req.at,
       });
     },
     async close() {
-      await release();
+      if (!input.existingLock) await release();
     },
   };
 }

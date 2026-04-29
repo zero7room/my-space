@@ -16,6 +16,7 @@ export type CreateWorkerHostInput = {
   systemPrompt: string;
   maxSteps: number;
   leaseMs: number;
+  existingLock?: { release: ReleaseLock; skipBoot: boolean };
 };
 
 export type WorkerHost = {
@@ -30,10 +31,12 @@ export type WorkerHost = {
 export async function createWorkerHost(
   input: CreateWorkerHostInput,
 ): Promise<WorkerHost> {
-  const release: ReleaseLock = await acquireInstanceLock(input.paths, input.runtimeId, {
-    role: "worker",
-  });
-  await recoverOnBoot(input.paths, input.runtimeId, { dedupeRetentionDays: 30 });
+  const release: ReleaseLock =
+    input.existingLock?.release ??
+    (await acquireInstanceLock(input.paths, input.runtimeId, { role: "worker" }));
+  if (!input.existingLock?.skipBoot) {
+    await recoverOnBoot(input.paths, input.runtimeId, { dedupeRetentionDays: 30 });
+  }
 
   const taskRepo = createTaskRepo(input.paths, input.runtimeId);
   const planRepo = createPlanRepo(input.paths, input.runtimeId);
@@ -67,7 +70,7 @@ export async function createWorkerHost(
       return runWorkerPoolOnce(args);
     },
     async close() {
-      await release();
+      if (!input.existingLock) await release();
     },
   };
 }
