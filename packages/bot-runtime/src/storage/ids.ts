@@ -15,7 +15,9 @@ export type IdPrefix =
   | "policy"
   | "bd"
   | "exec"
-  | "guard";
+  | "guard"
+  | "ie"
+  | "cj";
 
 export function newId(prefix: IdPrefix): string {
   return `${prefix}_${uuidv7()}`;

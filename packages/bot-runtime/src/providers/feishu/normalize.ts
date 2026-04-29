@@ -74,7 +74,7 @@ export async function normalizeFeishuInbound(
 
   return {
     externalEventId: env.header?.event_id ?? "",
-    externalMessageId: msg.message_id,
+    ...(msg.message_id !== undefined && { externalMessageId: msg.message_id }),
     externalConversationId: msg.chat_id ?? "",
     externalConversationType,
     externalUserId: sender,

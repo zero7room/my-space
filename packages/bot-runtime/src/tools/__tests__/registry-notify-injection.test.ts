@@ -27,10 +27,10 @@ describe("createDefaultToolRegistry — notify_bound_channel injection", () => {
     });
     const tool = tools.find((t) => t.name === "notify_bound_channel");
     expect(tool).toBeDefined();
-    const out = await tool!.call(
+    const out = (await tool!.call(
       { target: "all", message: "x", importance: "info" },
       { ctx: {} as never },
-    );
+    )) as { status: string; reason?: string };
     // No bindings → real tool returns binding_unavailable WITHOUT reason "channel deps not provided"
     expect(out.status).toBe("binding_unavailable");
     expect(out.reason).not.toContain("channel deps not provided");
@@ -48,10 +48,10 @@ describe("createDefaultToolRegistry — notify_bound_channel injection", () => {
     });
     const tool = tools.find((t) => t.name === "notify_bound_channel");
     expect(tool).toBeDefined();
-    const out = await tool!.call(
+    const out = (await tool!.call(
       { target: "all", message: "x", importance: "info" },
       { ctx: {} as never },
-    );
+    )) as { status: string; reason?: string };
     expect(out.status).toBe("binding_unavailable");
     expect(out.reason).toContain("channel deps not provided");
   });

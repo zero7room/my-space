@@ -40,7 +40,7 @@ export function mountChannelConfigApi(server: IngressServer, opts: ChannelConfig
 
   server.route("PUT", "/api/channels/feishu", async (req) => {
     if (!checkAdmin(req.headers, opts.adminToken)) return { status: 401 };
-    let parsed: unknown;
+    let parsed: ReturnType<typeof UpsertSchema.parse>;
     try {
       parsed = UpsertSchema.parse(JSON.parse(req.rawBody.toString("utf8")));
     } catch (err) {

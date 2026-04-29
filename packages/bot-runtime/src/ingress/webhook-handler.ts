@@ -88,7 +88,9 @@ export function createWebhookHandler(opts: {
       return { status: 200, body: { ok: true, duplicate: true } };
     }
     await opts.inboundRepo.recordReceived(req.provider, normalized.externalEventId, {
-      externalMessageId: normalized.externalMessageId,
+      ...(normalized.externalMessageId !== undefined && {
+        externalMessageId: normalized.externalMessageId,
+      }),
     });
 
     const binding = await opts.lookupBinding(

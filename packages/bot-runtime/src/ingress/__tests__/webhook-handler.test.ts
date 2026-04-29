@@ -141,7 +141,10 @@ describe("WebhookHandler", () => {
     const handler = createWebhookHandler({
       registry: reg,
       inboundRepo: createInboundEventRepo(paths, runtimeId),
-      ingest: async () => ({ kind: "noop" }),
+      ingest: async (): Promise<import("../../thread-loop/thread-loop.js").ThreadLoopResult> => ({
+        kind: "noop",
+        intent: "chat",
+      }),
       lookupBinding: async () => ({ threadId: "th_1", bound: true, userId: "u_a" }),
       configResolver: async () => ({ secret: SECRET }),
     });
