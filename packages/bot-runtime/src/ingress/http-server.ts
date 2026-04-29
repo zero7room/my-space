@@ -9,11 +9,23 @@ export type IngressRequest = {
   params: Record<string, string>;
 };
 
-export type IngressResponse = {
+export type IngressResponseBody = {
   status: number;
   headers?: Record<string, string>;
   body?: unknown;
 };
+
+export type IngressResponseStream = {
+  status: number;
+  headers?: Record<string, string>;
+  stream: (
+    write: (chunk: string | Buffer) => void,
+    end: () => void,
+    abortSignal: AbortSignal,
+  ) => Promise<void>;
+};
+
+export type IngressResponse = IngressResponseBody | IngressResponseStream;
 
 export type IngressHandler = (req: IngressRequest) => Promise<IngressResponse>;
 
@@ -101,7 +113,17 @@ export function createIngressServer(): IngressServer {
       });
       res.statusCode = result.status;
       for (const [k, v] of Object.entries(result.headers ?? {})) res.setHeader(k, v);
-      if (result.body !== undefined) {
+      if ("stream" in result) {
+        const abortController = new AbortController();
+        const abort = () => abortController.abort();
+        req.on("close", abort);
+        res.on("close", abort);
+        await result.stream(
+          (chunk) => res.write(chunk),
+          () => res.end(),
+          abortController.signal,
+        );
+      } else if (result.body !== undefined) {
         if (typeof result.body === "string" || Buffer.isBuffer(result.body)) {
           res.end(result.body);
         } else {

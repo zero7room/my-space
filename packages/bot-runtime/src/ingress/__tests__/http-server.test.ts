@@ -79,4 +79,22 @@ describe("createIngressServer", () => {
     const body = await r.text();
     expect(body).toContain("exact");
   });
+
+  it("supports streaming responses", async () => {
+    server = createIngressServer();
+    server.route("GET", "/stream", async () => ({
+      status: 200,
+      headers: { "content-type": "text/event-stream" },
+      stream: async (write, end) => {
+        write("hello\n");
+        write("world\n");
+        end();
+      },
+    }));
+    const { port } = await server.listen(0);
+    const res = await fetch(`http://127.0.0.1:${port}/stream`);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("text/event-stream");
+    expect(await res.text()).toBe("hello\nworld\n");
+  });
 });
