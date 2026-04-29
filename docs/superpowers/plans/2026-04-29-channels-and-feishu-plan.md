@@ -4868,17 +4868,79 @@ git commit -m "docs(plan-2): self-review report and execution handoff"
 
 ## Plan 2 自查报告
 
-（执行 Task 34 时填写）
+**1. Spec 覆盖（Spec 第 17 章 #6 + #7）：**
+
+| Spec 起点 | Plan 2 任务 |
+|---|---|
+| #6 通用 ChannelProvider 接口 | Task 1 |
+| #6 ChannelIngress（HTTP 路由 + verify/dedupe/normalize/dispatch） | Task 6, 7, 8, 9, 30 |
+| #6 ChannelOutboundJobRunner | Task 4, 5, 30 |
+| #7 webhook + 长连接（v1 stub） | Task 11, 19 |
+| #7 文本消息 + DM/群路由 | Task 13, 14, 15 |
+| #7 脱敏配置 API | Task 3, 27, 28, 29 |
+| 替换 notify_bound_channel stub 为真实实现 | Task 24, 25, 26 |
+| Guardian 控制面 | Task 20, 21, 22, 23 |
+| v1 验收 #10（webhook 幂等） | Task 32 |
+
+附加：Task 18（Feishu factory）和 Task 30（HybridHost 集成）是把所有零件粘起来的胶水，不在 Spec 第 17 章独立列项但是落地必须。
+
+**2. 占位符扫描：**
+- `packages/bot-runtime/src/channel/` `ingress/` `providers/` `guardian/` `api/` 中无 `TODO` / `TBD` / `implement later` / `FIXME`。
+- Feishu LongConnection（Task 19）的 `not implemented in v1` 是按 v1 设计的明确 stub，不是占位符。
+
+**3. 类型一致性：**
+- `ChannelProvider.sendMessage` 签名：Task 1 定义 → Task 14 实现 → Task 16 装配 → Task 5 outbound runner 调用，参数 `SendMessageInput` 完全一致。
+- `BindingLookup`：Task 7 webhook-handler 定义 → Task 8 binding-lookup 实现 → Task 30 hybrid-host 注入，签名一致。
+- `ChannelInboundEvent` 状态机：Task 2 实现 → Task 7 webhook-handler 调用 markProcessed/markSkipped/markFailed。
+- `NotifyTarget`：Task 24 `_notify-target.ts` 定义 → Task 25 `notify-bound-channel.ts` 引用同一类型。
+- `IngressHandler` / `IngressRequest`：Task 6 定义 → Task 7、27、29 全部沿用。
+- `IdPrefix`：Task 30 顺手补了 `ie`/`cj` 到 `storage/ids.ts` 的 union（之前 schema 已使用但 `newId` 不识别，build 才暴露出来）。
+
+**4. 最终验证（Task 33）：**
+- `pnpm --filter @ai-employee/bot-runtime test`：90 files / **258 tests pass**
+- `pnpm -r build`：**0 type errors**
+- `pnpm lint`：**0 errors**
+- HEAD 在 `plan-2-channels` 分支上
 
 ---
 
 ## Execution Handoff
 
-（执行 Task 35 时填写）
+**Plan 2 已完成实施并验证通过，落在 `plan-2-channels` 分支上。**
+
+| 项 | 数值 |
+|---|---|
+| 总 task 数 | 35 |
+| 已完成 task | 35 |
+| 总测试数（Plan 1 + Plan 2） | 258（Plan 1: 159 → Plan 2: +99） |
+| 总 commit 数（Plan 2） | 30+（含 Plan 2 doc / 35 个 task / 1 build fix-up） |
+| 分支 | `plan-2-channels`（基于 `plan-1-runtime-core`） |
+| 远端 | 未推 |
+| Merge 状态 | 未合并到 main |
+
+**关键能力：**
+
+1. 通用 `ChannelProvider` 协议（verify / normalize / send / createConversation / deleteConversation）
+2. ChannelIngress：`createIngressServer` 提供 HTTP，`createWebhookHandler` 串起 verify → dedupe → normalize → binding 查找 → MasterHost 投递
+3. ChannelOutboundJobRunner：消费 ChannelJob 队列，按 provider 分派 send_message，含 retry / dead-letter
+4. Feishu Provider 第一版：webhook 验签（含 AES 解密）、tenant_access_token 缓存、normalize、send/create、@bot/reply/slash 检测
+5. Guardian：私聊与未绑群作为控制面入口，识别 `/bind /unbind /list /help` 命令
+6. UserDirectory：按 `(provider, externalUserId)` 复用同一 user
+7. notify_bound_channel：fan out 到所有 enabled+bound binding，写入 ChannelOutboundJobQueue
+8. ChannelConfigStore + 客户端 `/api/channels` 系列 API（脱敏视图，`hasSecret: bool`）
+9. HybridHost 集成：admin PUT /api/channels/feishu 注册 provider，POST /webhooks/feishu 落地真实事件
 
 ---
 
 ## 后续 Plan 预告
 
-- Plan 3：客户端最小可视化（Spec 第 17 章 #8）。
+- Plan 3：客户端最小可视化（Spec 第 17 章 #8）—— SSE 流、TaskList 视图、artifact 浏览。
 - Plan 4：Agent eval + v1 验收 e2e（Spec 第 17 章 #9-#10）。
+
+Plan 1 follow-ups（已知技术债）：
+- #19 paths.ts `channelType: string` 收紧成 `Provider` union（Plan 2 已用 `ProviderSchema`，可以现在做或 Plan 3 一起带）
+- #20 paths.ts 31 个方法全方法覆盖测试
+- #21 update-plan 工具直写路径测试
+- #22 critical-node 5 种 matcher 全覆盖测试
+
+建议：Plan 3 收尾时一次性补齐这 4 条。
