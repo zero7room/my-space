@@ -41,7 +41,9 @@ export async function runExecutor(
   const plan = await input.planRepo.loadPlan(task.threadId, task.id);
   if (!plan) throw new Error(`plan not found for task ${input.taskId}`);
 
-  await input.taskRepo.transitionStatus(input.taskId, "running");
+  if (task.status === "queued") {
+    await input.taskRepo.transitionStatus(input.taskId, "running");
+  }
   const fencingToken = 1; // master-issued via job; passed via dispatcher ctx
   const writer = createEventsWriter(
     input.paths,

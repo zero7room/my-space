@@ -139,4 +139,30 @@ describe("Executor agent loop", () => {
     const after = await taskRepo.load(t.id);
     expect(after?.status).toBe("awaiting_critical_node");
   });
+
+  it("tolerates resume from already-running task without throwing", async () => {
+    const { paths, taskRepo, planRepo, jobs, t } = await setup();
+    // Manually transition to running first to simulate recovery
+    await taskRepo.transitionStatus(t.id, "running");
+    const llm = {
+      async complete() {
+        return { kind: "text" as const, text: "resumed" };
+      },
+    };
+    const dispatcher = createDispatcher({ tools: [], policies: [] });
+    const result = await runExecutor({
+      paths,
+      runtimeId: "rt-1",
+      executorId: "exec-1",
+      taskRepo,
+      planRepo,
+      jobs,
+      dispatcher,
+      llm,
+      systemPrompt: "x",
+      taskId: t.id,
+      maxSteps: 5,
+    });
+    expect(result.outcome).toBe("completed");
+  });
 });
