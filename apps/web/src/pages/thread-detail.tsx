@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useAppContext } from "../app-context.js";
+import { ConversationPanel } from "../components/conversation-panel.js";
 import { useEventStream } from "../hooks/use-event-stream.js";
 
 type Thread = { id: string; title: string; status: string };
@@ -38,7 +39,7 @@ export function ThreadDetail() {
       <div className="panel left">
         <h3>{thread.title}</h3>
         <p className="status">{thread.status}</p>
-        <div>(Conversation panel — Task 19)</div>
+        {id && <ConversationPanel threadId={id} />}
       </div>
       <div className="panel center">
         <h4>Tasks</h4>

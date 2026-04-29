@@ -9,6 +9,7 @@ vi.mock("../../api/client.js", () => ({
     getThread: async () => ({ id: "th_1", title: "Project", status: "chatting" }),
     getTasks: async () => [{ id: "tk_1", title: "Task A", status: "running" }],
     getTranscript: async () => [],
+    postMessage: async () => ({ kind: "noop" }),
     getPlan: async () => null,
     getArtifacts: async () => [],
   }),
