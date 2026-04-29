@@ -16,3 +16,6 @@ coverage/
 
 # Local data (runtime workspace)
 data/
+
+# Eval run results
+tests/evals/results/

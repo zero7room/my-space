@@ -10,7 +10,8 @@
       "data/**",
       "**/*.zip",
       "apps/*/dist/**",
-      "apps/*/node_modules/**"
+      "apps/*/node_modules/**",
+      "**/tests/evals/results/**"
     ]
   },
   "organizeImports": { "enabled": true },
