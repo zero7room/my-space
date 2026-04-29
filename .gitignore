@@ -1,0 +1,18 @@
+# Local reference projects (not part of this codebase)
+claude-code-analysis/
+deer-flow/
+归档.zip
+
+# Node / pnpm
+node_modules/
+dist/
+*.log
+coverage/
+
+# Editor / OS
+.DS_Store
+.vscode/
+.idea/
+
+# Local data (runtime workspace)
+data/
