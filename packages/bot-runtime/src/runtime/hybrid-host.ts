@@ -1,4 +1,6 @@
 import { mountAdminApi } from "../api/mount.js";
+import { createThreadEventBroadcaster } from "../api/thread-event-broadcaster.js";
+import type { ThreadEventBroadcaster } from "../api/thread-event-broadcaster.js";
 import { createChannelConfigStore } from "../channel/config-store.js";
 import type { ChannelConfigStore } from "../channel/config-store.js";
 import { createInboundEventRepo } from "../channel/inbound-event-repo.js";
@@ -50,6 +52,7 @@ export type HybridHost = {
   providerRegistry: ProviderRegistry;
   ingressPort: number;
   channelStore: ChannelConfigStore;
+  broadcaster: ThreadEventBroadcaster;
 };
 
 export async function createHybridHost(input: CreateHybridHostInput): Promise<HybridHost> {
@@ -84,6 +87,7 @@ export async function createHybridHost(input: CreateHybridHostInput): Promise<Hy
       providerRegistry: undefined as unknown as ProviderRegistry,
       ingressPort: undefined as unknown as number,
       channelStore: undefined as unknown as ChannelConfigStore,
+      broadcaster: undefined as unknown as ThreadEventBroadcaster,
       async close() {
         await master.close();
         await worker.close();
@@ -138,6 +142,11 @@ export async function createHybridHost(input: CreateHybridHostInput): Promise<Hy
 
   const ingress = createIngressServer();
 
+  const broadcaster = createThreadEventBroadcaster({
+    paths: input.paths,
+    runtimeId: input.runtimeId,
+  });
+
   mountAdminApi(ingress, {
     adminToken,
     channelStore,
@@ -149,6 +158,7 @@ export async function createHybridHost(input: CreateHybridHostInput): Promise<Hy
     paths: input.paths,
     runtimeId: input.runtimeId,
     ingest: async (req) => master.ingestInbound(req),
+    broadcaster,
   });
 
   const lookup = createBindingLookup(input.paths, input.runtimeId, {
@@ -184,6 +194,7 @@ export async function createHybridHost(input: CreateHybridHostInput): Promise<Hy
     providerRegistry: registry,
     ingressPort: port,
     channelStore,
+    broadcaster,
     async close() {
       await ingress.close();
       await master.close();

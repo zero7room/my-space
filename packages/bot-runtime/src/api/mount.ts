@@ -9,9 +9,11 @@ import type { Paths } from "../storage/paths.js";
 import { mountActionApi } from "./action-api.js";
 import { mountArtifactApi } from "./artifact-api.js";
 import { mountChannelConfigApi } from "./channel-config-api.js";
+import { mountEventsApi } from "./events-api.js";
 import { mountPlanApi } from "./plan-api.js";
 import { mountTaskApi } from "./task-api.js";
 import { mountThreadApi } from "./thread-api.js";
+import type { ThreadEventBroadcaster } from "./thread-event-broadcaster.js";
 import { mountTranscriptApi } from "./transcript-api.js";
 
 export type AdminApiOptions = {
@@ -25,6 +27,7 @@ export type AdminApiOptions = {
   paths?: Paths;
   runtimeId?: string;
   ingest?: IngestFn;
+  broadcaster?: ThreadEventBroadcaster;
 };
 
 export function mountAdminApi(server: IngressServer, opts: AdminApiOptions): void {
@@ -55,4 +58,7 @@ export function mountAdminApi(server: IngressServer, opts: AdminApiOptions): voi
     });
   }
   if (opts.ingest) mountActionApi(server, { ingest: opts.ingest, adminToken: opts.adminToken });
+  if (opts.broadcaster) {
+    mountEventsApi(server, { broadcaster: opts.broadcaster, adminToken: opts.adminToken });
+  }
 }

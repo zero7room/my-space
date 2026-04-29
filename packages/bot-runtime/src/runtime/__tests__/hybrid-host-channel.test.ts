@@ -57,6 +57,29 @@ describe("HybridHost — channel wiring", () => {
     expect(Array.isArray(list)).toBe(true);
   });
 
+  it("exposes broadcaster + SSE endpoint", async () => {
+    host = await createHybridHost({
+      paths: createPaths(tmp),
+      runtimeId: "rt_test",
+      guardLlm: createStubLlmClient({}, { kind: "text", text: "" }),
+      draftLlm: createStubLlmClient({}, { kind: "text", text: "" }),
+      execLlm: createStubLlmClient({}, { kind: "text", text: "" }),
+      systemPrompt: "x",
+      maxSteps: 8,
+      leaseMs: 30000,
+      channel: { adminToken: "admin", ingressPort: 0 },
+    });
+    expect(typeof host.broadcaster.broadcast).toBe("function");
+    // SSE endpoint exists
+    const ctrl = new AbortController();
+    const r = await fetch(`http://127.0.0.1:${host.ingressPort}/api/threads/th_x/events`, {
+      headers: { "x-admin-token": "admin" },
+      signal: ctrl.signal,
+    });
+    expect(r.status).toBe(200);
+    ctrl.abort();
+  });
+
   it("admin PUT /api/channels/feishu registers a Feishu provider", async () => {
     host = await createHybridHost({
       paths: createPaths(tmp),
