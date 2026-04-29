@@ -22,6 +22,7 @@ export type CreateDraftPlanInput = {
 export type PlanRepo = {
   createDraftPlan(input: CreateDraftPlanInput): Promise<Plan>;
   loadPlan(threadId: string, taskId: string): Promise<Plan | null>;
+  loadByTaskId(taskId: string): Promise<Plan | null>;
   activate(planId: string, threadId: string, taskId: string): Promise<Plan>;
   supersedeWithRevision(
     planId: string,
@@ -57,6 +58,24 @@ async function moveDirContents(src: string, dst: string): Promise<void> {
   }
 }
 
+async function findThreadForTask(
+  paths: Paths,
+  runtimeId: string,
+  taskId: string,
+): Promise<string | null> {
+  const root = paths.threadsRoot(runtimeId);
+  try {
+    const threads = await readdir(root);
+    for (const threadId of threads) {
+      const plan = await readJson(paths.taskPlan(runtimeId, threadId, taskId));
+      if (plan) return threadId;
+    }
+  } catch {
+    /* no threads yet */
+  }
+  return null;
+}
+
 export function createPlanRepo(paths: Paths, runtimeId: string): PlanRepo {
   return {
     async createDraftPlan(input) {
@@ -83,6 +102,12 @@ export function createPlanRepo(paths: Paths, runtimeId: string): PlanRepo {
     async loadPlan(threadId, taskId) {
       const raw = await readJson(paths.taskPlan(runtimeId, threadId, taskId));
       return raw ? PlanSchema.parse(raw) : null;
+    },
+
+    async loadByTaskId(taskId) {
+      const threadId = await findThreadForTask(paths, runtimeId, taskId);
+      if (!threadId) return null;
+      return this.loadPlan(threadId, taskId);
     },
 
     async activate(planId, threadId, taskId) {
