@@ -33,7 +33,12 @@ export function ThreadDetail() {
   }, [client, id]);
 
   const sseUrl = id ? `/api/threads/${id}/events?_token=${encodeURIComponent(adminToken)}` : "";
-  useEventStream({ url: sseUrl });
+  const { events } = useEventStream<{ id: string; kind: string }>({ url: sseUrl });
+
+  useEffect(() => {
+    if (events.length === 0 || !id) return;
+    client.getTasks(id).then((ts) => setTasks(ts as TaskSummary[]));
+  }, [events.length, client, id]);
 
   if (!thread) return <div>Loading...</div>;
   return (
