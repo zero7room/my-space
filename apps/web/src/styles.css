@@ -19,3 +19,15 @@ main {
   overflow: auto;
   padding: 16px;
 }
+.thread-detail {
+  display: flex;
+  gap: 16px;
+  height: 100%;
+}
+.thread-detail .panel {
+  flex: 1;
+  min-width: 280px;
+  padding: 12px;
+  border: 1px solid #eee;
+  overflow: auto;
+}

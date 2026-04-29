@@ -1,6 +1,7 @@
 import { Link, Route, Routes } from "react-router-dom";
 import { AppContextProvider } from "./app-context.js";
 import { TokenInput } from "./components/token-input.js";
+import { ThreadDetail } from "./pages/thread-detail.js";
 import { ThreadList } from "./pages/thread-list.js";
 
 export function App() {
@@ -14,7 +15,7 @@ export function App() {
         <main>
           <Routes>
             <Route path="/" element={<ThreadList />} />
-            <Route path="/threads/:id" element={<div>Thread detail (coming in Task 18)</div>} />
+            <Route path="/threads/:id" element={<ThreadDetail />} />
           </Routes>
         </main>
       </div>
