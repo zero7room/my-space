@@ -15,6 +15,7 @@ const UpsertSchema = z.object({
 export type ChannelConfigApiOptions = {
   store: ChannelConfigStore;
   adminToken: string;
+  onConfigChanged?: (provider: string) => void | Promise<void>;
 };
 
 function checkAdmin(headers: Record<string, string | string[] | undefined>, expected: string) {
@@ -47,6 +48,7 @@ export function mountChannelConfigApi(server: IngressServer, opts: ChannelConfig
       return { status: 400, body: { error: message } };
     }
     const cfg = await opts.store.upsert("feishu", parsed);
+    await opts.onConfigChanged?.("feishu");
     return { status: 200, body: { provider: cfg.provider, updatedAt: cfg.updatedAt } };
   });
 }
