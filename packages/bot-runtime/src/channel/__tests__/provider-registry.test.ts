@@ -49,4 +49,13 @@ describe("createProviderRegistry", () => {
     r.register(makeFake("slack"));
     expect(r.list().sort()).toEqual(["feishu", "slack"]);
   });
+
+  it("removes a registered provider", () => {
+    const r = createProviderRegistry();
+    r.register(makeFake("feishu"));
+    expect(r.get("feishu")).toBeTruthy();
+    r.remove("feishu");
+    expect(r.get("feishu")).toBeNull();
+    expect(r.list()).toEqual([]);
+  });
 });

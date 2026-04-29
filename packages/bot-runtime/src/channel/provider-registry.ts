@@ -5,6 +5,7 @@ export type ProviderRegistry = {
   register(p: ChannelProvider): void;
   get(name: string): ChannelProvider | null;
   list(): string[];
+  remove(name: string): void;
 };
 
 export function createProviderRegistry(): ProviderRegistry {
@@ -21,6 +22,9 @@ export function createProviderRegistry(): ProviderRegistry {
     },
     list() {
       return [...map.keys()];
+    },
+    remove(name) {
+      map.delete(name);
     },
   };
 }
