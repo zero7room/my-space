@@ -3171,13 +3171,69 @@ git commit -m "docs(plan-3): self-review report and execution handoff"
 
 ## Plan 3 自查报告
 
-（执行 Task 30 时填写）
+**1. Spec 覆盖（Spec 第 10 章 + 第 17 章 #8）：**
+
+| Spec 起点 | Plan 3 任务 |
+|---|---|
+| 客户端 thread / task / plan / artifact / transcript 只读 API | Task 1, 3, 4, 5, 6 |
+| 路由参数化（`:id`） | Task 2 |
+| 客户端写操作（confirm/cancel/post message） | Task 7 |
+| HTTP 流式协议（SSE） | Task 9, 10, 11, 12 |
+| HybridHost 集成所有 API | Task 8, 12 |
+| Vite + React 客户端脚手架 | Task 13 |
+| API client + EventSource hook + AppContext | Task 14, 15, 16 |
+| ThreadList / ThreadDetail / Conversation / Plan / Artifact / Channel 配置页 | Task 17, 18, 19, 20, 21, 22 |
+| Plan 1 follow-ups #19-#22 | Task 24, 25, 26, 27 |
+| E2E smoke + 全量验证 | Task 28, 29, 30 |
+
+**2. 占位符扫描：**
+- 所有 `apps/web/src/**` 与 `packages/bot-runtime/src/api/**` 无 `TODO` / `TBD` / `implement later` / `FIXME`。
+- ThreadDetail 内 panel 之间的占位 `(coming in Task ...)` 注释在 Task 19/20/21 替换完毕，已彻底消失。
+
+**3. 类型一致性：**
+- `IngressRequest.params: Record<string, string>` 由 Task 2 引入 → Task 1, 3-7, 11 全部使用。
+- `ApiClient` 接口（`apps/web/src/api/client.ts`）定义的所有方法签名与后端 API 端点一一对应（Task 14 → Task 1-7）。
+- `IngestFn` 类型在 Plan 2 webhook-handler 定义 → 被 Plan 3 Task 7 action-api 与 Task 8 mountAdminApi 直接复用。
+- `Provider` union 经 Task 24 收紧后，Task 1-12、Plan 2 全部已落到 union 类型。
+- `ThreadEventBroadcaster` 接口（Task 10）→ events-api（Task 11）→ HybridHost（Task 12）全链一致。
+
+**4. 最终验证（Task 29）：**
+- `pnpm -r test`：bot-runtime 101 files / **331 tests** + apps/web 8 files / **11 tests** = **342 tests pass**
+- `pnpm -r build`：**0 type errors**
+- `pnpm lint`：232 files / **0 errors**
+- HEAD 在 `plan-3-client` 分支上
+
+**5. Plan 1 follow-ups 关闭情况：**
+
+| Follow-up | 状态 |
+|---|---|
+| #19 channelType 收紧成 Provider union | ✅ Task 24 完成 |
+| #20 paths.ts 全方法（30 个）覆盖测试 | ✅ Task 25 完成 |
+| #21 update_plan 直写路径集成测试 | ✅ Task 26 完成（顺带发现两个分支：fallback 走 createDraftPlan，direct-write 经 paths/runtimeId 直接写盘） |
+| #22 critical-node 5 matcher 全覆盖 | ✅ Task 27 完成（顺手扩了 evaluator：external_io 现支持 provider 过滤） |
 
 ---
 
 ## Execution Handoff
 
-（执行 Task 30 时填写）
+**Plan 3 已完成实施并验证通过，落在 `plan-3-client` 分支上。**
+
+| 项 | 数值 |
+|---|---|
+| 总 task 数 | 30 |
+| 已完成 task | 30 |
+| 总测试数 | 342（Plan 1+2: 258 → Plan 3: +84） |
+| 总 commit 数 | ~40（Plan 3 doc + 30 个 task 的实现 + 几个 fix-up） |
+| 分支 | `plan-3-client`（基于 `plan-2-channels`） |
+| 远端 | 未推 |
+| Merge 状态 | 未合并到 main |
+
+**关键能力：**
+
+1. 后端：`/api/threads`、`/api/threads/:id`、`/api/threads/:id/tasks`、`/api/tasks/:id`、`/api/tasks/:id/plan`、`/api/tasks/:id/artifacts`、`/api/threads/:id/transcript`、`/api/threads/:id/messages`、`/api/tasks/:id/confirm|cancel`、`/api/threads/:id/events` (SSE)、`/api/channels`，全部走 `x-admin-token` 鉴权（SSE 额外接受 `?_token=` query 兜底）。
+2. SSE 端点 backlog replay（events.jsonl 跨任务）+ in-memory broadcast，cursor 支持续传。
+3. 前端 `apps/web`：Vite + React 18 + TypeScript + react-router 6（无 UI 库）。pages: ThreadList / ThreadDetail（三栏）/ ChannelConfig。三栏：左 Conversation / 中 TaskPlan + Confirm·Cancel / 右 Artifact + viewer。SSE 实时刷新 task。客户端 secret 字段只看 `hasSecret`。
+4. Plan 1 follow-up 全部清掉，bot-runtime 测试覆盖率明显提升（287 → 331）。
 
 ---
 
