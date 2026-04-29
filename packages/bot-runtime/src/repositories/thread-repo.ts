@@ -49,6 +49,7 @@ export function createThreadRepo(paths: Paths, runtimeId: string): ThreadRepo {
         ...cur,
         ...patch,
         id: cur.id,
+        createdAt: cur.createdAt,
         updatedAt: new Date().toISOString(),
       });
       await writeJson(paths.threadJson(runtimeId, threadId), next);

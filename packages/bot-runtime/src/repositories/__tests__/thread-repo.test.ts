@@ -48,4 +48,16 @@ describe("ThreadRepo", () => {
     const all = await repo.listAll();
     expect(all).toHaveLength(2);
   });
+
+  it("update preserves createdAt even if patch tries to override it", async () => {
+    const repo = createThreadRepo(createPaths(dataRoot), "rt-1");
+    const t = await repo.create({
+      title: "demo",
+      ownerUserId: "u_018f5d20-0000-7000-8000-000000000001",
+    });
+    const tampered = await repo.update(t.id, {
+      createdAt: "2000-01-01T00:00:00Z" as never,
+    });
+    expect(tampered.createdAt).toBe(t.createdAt);
+  });
 });
