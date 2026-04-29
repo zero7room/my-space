@@ -40,7 +40,7 @@ export function createChannelOutboundJobQueue(
   }
 
   async function locate(jobId: string): Promise<string | null> {
-    for (const sub of ["pending", "locked", "done", "failed"]) {
+    for (const sub of ["done", "failed", "locked", "pending"]) {
       const f = path.posix.join(jobsRoot, sub, `${jobId}.json`);
       const got = await readJson(f);
       if (got) return f;
