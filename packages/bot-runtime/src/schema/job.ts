@@ -13,6 +13,11 @@ export const ExecuteTaskJobSchema = z.object({
   budget: TaskBudgetSchema.optional(),
   lockHolder: z.string().optional(),
   leaseExpireAt: z.string().datetime({ offset: true }).optional(),
+  completedAt: z.string().datetime({ offset: true }).optional(),
+  failedAt: z.string().datetime({ offset: true }).optional(),
+  outcome: z.enum(["completed", "failed", "cancelled"]).optional(),
+  error: z.string().optional(),
+  lastError: z.string().optional(),
 });
 export type ExecuteTaskJob = z.infer<typeof ExecuteTaskJobSchema>;
 
