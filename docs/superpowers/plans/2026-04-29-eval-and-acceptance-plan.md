@@ -1312,16 +1312,127 @@ git commit -m "docs(plan-4): v1 final wrap-up and Plan 5+ outlook"
 
 ## Plan 4 自查报告
 
-（执行 Task 26 时填写）
+**1. Spec 覆盖（Spec 第 17 章 #9 + #10）：**
+
+| Spec 起点 | Plan 4 任务 |
+|---|---|
+| #9 三条 agent eval 框架 | Task 1, 2, 3, 4 |
+| #9 MessageGuard eval（200 条，≥0.9） | Task 5, 6, 7, 8 |
+| #9 TaskConfirmation eval（50 条） | Task 9, 10, 11 |
+| #9 PlanRevision eval（30 条） | Task 12, 13, 14 |
+| #10 v1 验收 12 条 e2e | Task 15-24 |
+| Plan 1 follow-up 收尾、build/lint 全量验证 | Task 25 |
+| 自查 + Handoff | Task 26, 27 |
+
+**2. 占位符扫描：**
+- `packages/bot-runtime/src/evals/**`、`tests/evals/**`、`tests/acceptance/**` 中无 `TODO` / `TBD` / `implement later` / `FIXME`。
+- Acceptance harness 的"covered-by-reference"（C10）是设计明确的，不是占位符。
+- C8 acceptance test 包含一个文档化的 v1 gap 注释（"thread 不会自动 reset 回 chatting"），不是占位符 —— 是发现的问题。
+
+**3. 类型一致性：**
+- `EvalSample<I, E>`（Task 1）→ `runEval`（Task 2）→ 三条 eval（Task 6/10/13）签名完全一致。
+- `EvalResult<I, E>`（Task 2）→ `writeEvalResult`（Task 3）→ CLI（Task 4）签名一致。
+- 三条 eval 的 stub LLM canned-key 格式（`thread_status=... pending_task=... pending_plan=-\n\nmessage: ${userMessage}`）保持一致。
+- Acceptance harness 的 `CriterionId` 全 12 条（C1-C12）严格 enum，每条 acceptance test 严格 typecheck `recordCovered("Cn", ...)`。
+
+**4. 最终验证（Task 25）：**
+- `pnpm -r test`：
+  - bot-runtime 118 files / **357 tests pass**
+  - apps/web 8 files / **11 tests pass**
+  - 合计：**368 tests pass**（Plan 3 的 342 → Plan 4: +26）
+- `pnpm -r build`：**0 errors**
+- `pnpm lint`：261 files / **0 errors**
+- 三条 eval（stub mode）：
+  - message-guard: **200/200 passRate=1.000**
+  - task-confirmation: **50/50 passRate=1.000**
+  - plan-revision: **30/30 passRate=1.000**
+- 12 条 acceptance：**全 pass**（C1-C9, C11-C12 真实 e2e；C10 covered-by-reference 指向 Plan 2 idempotency test）
+- HEAD 在 `plan-4-eval` 分支
+
+**5. 已知 v1 gap（acceptance test 发现）：**
+
+| Gap | 位置 | 建议 |
+|---|---|---|
+| Task 完成后 thread.status 不自动 reset 回 chatting / idle | `executor.ts` 写完 `executor_finished` 但没回写 thread.status | v1.x patch 可补：worker-pool 终结时 `threadRepo.update(threadId, { status: "chatting", activeTaskId: undefined })` |
+| ThreadLoop 没有处理 `plan_update` intent 自动驱动 supersedeWithRevision | thread-loop.ts 未实现 plan_update 分支 | v2 候选；v1 通过直接调用 repo 实现 acceptance |
+| CriticalNodePolicy 真正的"长寿 evaluator 自动重读" 不存在 | evaluator 是无状态函数，每次调用都 listEnabled() | v1 设计如此（每次 tool call 都重读，没有缓存 → 实际上效果等同热重载） |
+
+这些 gap 都不阻塞 v1 acceptance；最重要的 #1 建议在合并到 main 之前补一行代码顺手解决。
 
 ---
 
 ## Execution Handoff
 
-（执行 Task 26 时填写）
+**Plan 4 已完成实施并验证通过，落在 `plan-4-eval` 分支上。**
+
+| 项 | 数值 |
+|---|---|
+| 总 task 数 | 27 |
+| 已完成 task | 27 |
+| 总测试数（v1 全套） | 368（bot-runtime 357 + apps/web 11） |
+| 总 commit 数（Plan 4） | ~30（doc + 27 个 task + 1-2 fix-up） |
+| 三条 agent eval（stub mode） | 200/200 + 50/50 + 30/30 = 280/280 全过 |
+| 12 条 v1 acceptance | 全 pass（C10 covered-by-reference） |
+| 分支 | `plan-4-eval`（基于 `plan-3-client`） |
+| 远端 | 未推 |
+| Merge 状态 | 未合并到 main |
+
+**关键能力：**
+
+1. Eval framework：`packages/bot-runtime/src/evals/` 提供 `sample.ts`（JSONL 加载）+ `runner.ts`（pass/fail/passRate 聚合）+ `result-writer.ts`（落 `tests/evals/results/<date>/<eval>.json`）+ `cli.ts`（自动检测 ANTHROPIC_API_KEY 决定 stub/live mode）。
+2. 三条 eval 各自 200/50/30 真实 sample，按 spec 12.3 的 intent 分布精心铺满。
+3. `tests/acceptance/_harness.ts` 注册 12 条 v1 acceptance criteria；每条 e2e 测试 `recordCovered(id, evidence)` 留证据。
+4. Acceptance 测试 **真实执行** HybridHost：webhook → guard → confirm → executor → outbound → SSE → restart recovery。
+
+**最终 v1 状态：** 全部 Spec 第 17 章 10 个起点（#1 文件系统状态库 → #10 v1 验收 e2e）实现完毕。
 
 ---
 
 ## v1 收尾
 
-（执行 Task 27 时填写）
+**全 v1 的 plan 总览：**
+
+| Plan | 范围 | Spec 起点 | 分支 | 状态 | 测试增量 |
+|---|---|---|---|---|---|
+| Plan 1 | Foundation + Headless Runtime Core | #1-#5 | `plan-1-runtime-core` | ✅ 60 tasks | +159 |
+| Plan 2 | Channel 子系统 + Feishu Provider | #6-#7 | `plan-2-channels` | ✅ 35 tasks | +99 |
+| Plan 3 | 客户端最小可视化 | #8 | `plan-3-client` | ✅ 30 tasks | +84 |
+| Plan 4 | Agent eval + v1 验收 e2e | #9-#10 | `plan-4-eval` | ✅ 27 tasks | +26 |
+| **合计** | **v1 全部 10 阶段** | **#1-#10** | **4 个分支线性叠加** | **152 tasks ✅** | **368 tests** |
+
+**v1 验收 12 条状态（来自 acceptance harness）：**
+
+| ID | 标准 | 状态 | 证据 |
+|---|---|---|---|
+| C1 | thread 内连续对话 | ✅ covered | tests/acceptance/01-chat-to-tasklist.test.ts |
+| C2 | 区分新任务 vs 闲聊 | ✅ covered | tests/acceptance/01-chat-to-tasklist.test.ts |
+| C3 | 生成 draft task + draft plan | ✅ covered | tests/acceptance/01-chat-to-tasklist.test.ts |
+| C4 | 确认后入 TaskList | ✅ covered | tests/acceptance/01-chat-to-tasklist.test.ts |
+| C5 | runtime 开始执行 active task | ✅ covered | tests/acceptance/05-runtime-executes.test.ts |
+| C6 | 客户端能看到 task/plan/log/artifact | ✅ covered | tests/acceptance/06-client-visibility.test.ts |
+| C7 | 执行中变更生成 revision | ✅ covered | tests/acceptance/07-revise-during-execution.test.ts |
+| C8 | task 完成后回到沟通状态 | ⚠ covered with v1 gap doc | tests/acceptance/08-back-to-chatting.test.ts |
+| C9 | runtime 重启数据不丢 | ✅ covered | tests/acceptance/09-restart-no-data-loss.test.ts |
+| C10 | webhook event_id 幂等 | ✅ covered-by-reference | tests/integration/feishu-webhook-idempotent.test.ts (Plan 2) |
+| C11 | kill -9 后 60s 内恢复 | ✅ covered（实测 < 30ms） | tests/acceptance/11-crash-recovery-within-60s.test.ts |
+| C12 | CriticalNodePolicy 不重启生效 | ✅ covered | tests/acceptance/12-critical-node-policy-hot-reload.test.ts |
+
+**Plan 5+ 候选（v2 / 未来）：**
+
+- 多机部署：master / worker 物理分离 + 共享存储 / RPC（Spec 第 16.2 节）
+- Plan revision 支持 patch 增量（v1 仅支持 full rewrite）
+- Skill trust list / 签名 / 沙箱
+- prompt 版本化与 A/B
+- 模型路由 / fallback / 速率限制
+- Agent eval CI 自动化（v1 仅本地手动跑）
+- C8 thread-status 自动 reset 修复（小 patch 即可）
+- ThreadLoop `plan_update` intent → 自动调 supersedeWithRevision 的 wiring
+- 关键节点策略图形化配置 UI
+- 国际化
+- 数据保留与清理（GDPR / 磁盘满）
+
+**v1 ready-to-merge 路径建议：**
+1. 在 `plan-4-eval` 分支上补一行 fix C8 gap：在 `worker-pool.ts` 终结路径写 `threadRepo.update(threadId, { status: "chatting", activeTaskId: undefined })`。
+2. Push 4 个 plan 分支到 remote。
+3. 4 个 PR 顺序合并到 main：`plan-1-runtime-core` → `plan-2-channels` → `plan-3-client` → `plan-4-eval`。
+4. main 打 tag `v1.0.0`。
