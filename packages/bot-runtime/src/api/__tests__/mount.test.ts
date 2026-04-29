@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createChannelConfigStore } from "../../channel/config-store.js";
 import { type IngressServer, createIngressServer } from "../../ingress/http-server.js";
+import { createThreadRepo } from "../../repositories/thread-repo.js";
 import { createPaths } from "../../storage/paths.js";
 import { mountAdminApi } from "../mount.js";
 
@@ -27,6 +28,24 @@ describe("mountAdminApi", () => {
     });
     const { port } = await server.listen(0);
     const r = await fetch(`http://127.0.0.1:${port}/api/channels`, {
+      headers: { "x-admin-token": "a" },
+    });
+    expect(r.status).toBe(200);
+  });
+
+  it("registers thread API when threadRepo provided", async () => {
+    const tmp2 = await mkdtemp(path.join(tmpdir(), "mn2-"));
+    const paths = createPaths(tmp2);
+    const threadRepo = createThreadRepo(paths, "rt_test");
+    mountAdminApi(server, {
+      adminToken: "a",
+      channelStore: createChannelConfigStore(paths, "rt_test"),
+      threadRepo,
+      paths,
+      runtimeId: "rt_test",
+    });
+    const { port } = await server.listen(0);
+    const r = await fetch(`http://127.0.0.1:${port}/api/threads`, {
       headers: { "x-admin-token": "a" },
     });
     expect(r.status).toBe(200);

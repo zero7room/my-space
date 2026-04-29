@@ -142,6 +142,13 @@ export async function createHybridHost(input: CreateHybridHostInput): Promise<Hy
     adminToken,
     channelStore,
     onChannelConfigChanged: rebuildProvider,
+    threadRepo: master.threadRepo,
+    taskRepo: master.taskRepo,
+    planRepo: master.planRepo,
+    transcript: master.transcript,
+    paths: input.paths,
+    runtimeId: input.runtimeId,
+    ingest: async (req) => master.ingestInbound(req),
   });
 
   const lookup = createBindingLookup(input.paths, input.runtimeId, {

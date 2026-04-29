@@ -37,6 +37,26 @@ describe("HybridHost — channel wiring", () => {
     expect(host.providerRegistry.list()).toEqual([]);
   });
 
+  it("exposes /api/threads through admin mount", async () => {
+    host = await createHybridHost({
+      paths: createPaths(tmp),
+      runtimeId: "rt_test",
+      guardLlm: createStubLlmClient({}, { kind: "text", text: "" }),
+      draftLlm: createStubLlmClient({}, { kind: "text", text: "" }),
+      execLlm: createStubLlmClient({}, { kind: "text", text: "" }),
+      systemPrompt: "x",
+      maxSteps: 8,
+      leaseMs: 30000,
+      channel: { adminToken: "admin", ingressPort: 0 },
+    });
+    const r = await fetch(`http://127.0.0.1:${host.ingressPort}/api/threads`, {
+      headers: { "x-admin-token": "admin" },
+    });
+    expect(r.status).toBe(200);
+    const list = await r.json();
+    expect(Array.isArray(list)).toBe(true);
+  });
+
   it("admin PUT /api/channels/feishu registers a Feishu provider", async () => {
     host = await createHybridHost({
       paths: createPaths(tmp),
