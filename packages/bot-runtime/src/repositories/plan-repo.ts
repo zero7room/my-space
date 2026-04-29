@@ -1,8 +1,5 @@
 import { mkdir, readdir, rename, stat } from "node:fs/promises";
 import path from "node:path";
-import { readJson, writeJson } from "../storage/json-file.js";
-import { newId } from "../storage/ids.js";
-import type { Paths } from "../storage/paths.js";
 import {
   type Plan,
   type PlanRevision,
@@ -10,6 +7,9 @@ import {
   PlanSchema,
   type PlanStep,
 } from "../schema/plan.js";
+import { newId } from "../storage/ids.js";
+import { readJson, writeJson } from "../storage/json-file.js";
+import type { Paths } from "../storage/paths.js";
 
 export type CreateDraftPlanInput = {
   taskId: string;
@@ -76,10 +76,7 @@ export function createPlanRepo(paths: Paths, runtimeId: string): PlanRepo {
       await mkdir(paths.taskDir(runtimeId, input.threadId, input.taskId), {
         recursive: true,
       });
-      await writeJson(
-        paths.taskPlan(runtimeId, input.threadId, input.taskId),
-        plan,
-      );
+      await writeJson(paths.taskPlan(runtimeId, input.threadId, input.taskId), plan);
       return plan;
     },
 
@@ -91,7 +88,7 @@ export function createPlanRepo(paths: Paths, runtimeId: string): PlanRepo {
     async activate(planId, threadId, taskId) {
       const cur = await this.loadPlan(threadId, taskId);
       if (!cur) throw new Error(`plan not found for task ${taskId}`);
-      if (cur.id !== planId) throw new Error(`planId mismatch`);
+      if (cur.id !== planId) throw new Error("planId mismatch");
       const next = PlanSchema.parse({
         ...cur,
         status: "active",
@@ -106,15 +103,10 @@ export function createPlanRepo(paths: Paths, runtimeId: string): PlanRepo {
     async supersedeWithRevision(planId, threadId, taskId, input) {
       const cur = await this.loadPlan(threadId, taskId);
       if (!cur) throw new Error(`plan not found for task ${taskId}`);
-      if (cur.id !== planId) throw new Error(`planId mismatch`);
+      if (cur.id !== planId) throw new Error("planId mismatch");
 
       const revisionId = newId("rv");
-      const archiveDir = paths.outputsArchive(
-        runtimeId,
-        threadId,
-        taskId,
-        revisionId,
-      );
+      const archiveDir = paths.outputsArchive(runtimeId, threadId, taskId, revisionId);
       const outputs = paths.outputs(runtimeId, threadId, taskId);
       const archivedPaths: string[] = [];
       try {
@@ -171,18 +163,12 @@ export function createPlanRepo(paths: Paths, runtimeId: string): PlanRepo {
         archivedArtifactPaths: [],
         createdAt: now,
       });
-      await writeJson(
-        paths.planRevision(runtimeId, threadId, taskId, revisionId),
-        newRev,
-      );
+      await writeJson(paths.planRevision(runtimeId, threadId, taskId, revisionId), newRev);
       return newRev;
     },
 
     async listRevisions(threadId, taskId) {
-      const dir = path.posix.join(
-        paths.taskDir(runtimeId, threadId, taskId),
-        "plan-revisions",
-      );
+      const dir = path.posix.join(paths.taskDir(runtimeId, threadId, taskId), "plan-revisions");
       let files: string[] = [];
       try {
         files = await readdir(dir);

@@ -1,5 +1,16 @@
 {
   "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
+  "files": {
+    "ignore": [
+      "claude-code-analysis/**",
+      "deer-flow/**",
+      "node_modules/**",
+      "dist/**",
+      "coverage/**",
+      "data/**",
+      "**/*.zip"
+    ]
+  },
   "organizeImports": { "enabled": true },
   "linter": {
     "enabled": true,
@@ -10,5 +21,16 @@
     "indentStyle": "space",
     "indentWidth": 2,
     "lineWidth": 100
-  }
+  },
+  "overrides": [
+    {
+      "include": ["**/__tests__/**", "**/tests/**", "**/*.test.ts"],
+      "linter": {
+        "rules": {
+          "style": { "noNonNullAssertion": "off" },
+          "suspicious": { "noExplicitAny": "off" }
+        }
+      }
+    }
+  ]
 }

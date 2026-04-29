@@ -34,7 +34,8 @@ export function createStubLlmClient(
     async complete(req) {
       const last = [...req.messages].reverse().find((m) => m.role === "user");
       const key = last?.content ?? "";
-      if (key in cannedByLastUser) return cannedByLastUser[key]!;
+      const canned = cannedByLastUser[key];
+      if (canned) return canned;
       if (fallback) return fallback;
       throw new Error(`stub LLM has no canned reply for: ${key}`);
     },
