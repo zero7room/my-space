@@ -1,13 +1,18 @@
 import { mkdir, readFile, readdir, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { type ChannelBinding, ChannelBindingSchema } from "../schema/channel.js";
+import {
+  type ChannelBinding,
+  ChannelBindingSchema,
+  type Provider,
+  ProviderSchema,
+} from "../schema/channel.js";
 import { newId } from "../storage/ids.js";
 import { readJson, writeJson } from "../storage/json-file.js";
 import type { Paths } from "../storage/paths.js";
 
 export type CreateBindingInput = {
   threadId: string;
-  provider: string;
+  provider: Provider;
   externalConversationId?: string;
   externalConversationType: "dm" | "group" | "topic";
   createdBy: ChannelBinding["createdBy"];
@@ -15,17 +20,17 @@ export type CreateBindingInput = {
 
 export type ChannelBindingRepo = {
   create(input: CreateBindingInput): Promise<ChannelBinding>;
-  load(threadId: string, provider: string, bindingId: string): Promise<ChannelBinding | null>;
+  load(threadId: string, provider: Provider, bindingId: string): Promise<ChannelBinding | null>;
   listForThread(threadId: string): Promise<ChannelBinding[]>;
   updateStatus(
     threadId: string,
-    provider: string,
+    provider: Provider,
     bindingId: string,
     next: ChannelBinding["status"],
   ): Promise<ChannelBinding>;
-  claimChat(provider: string, externalChatId: string, threadId: string): Promise<void>;
-  releaseChat(provider: string, externalChatId: string): Promise<void>;
-  whoClaimsChat(provider: string, externalChatId: string): Promise<string | null>;
+  claimChat(provider: Provider, externalChatId: string, threadId: string): Promise<void>;
+  releaseChat(provider: Provider, externalChatId: string): Promise<void>;
+  whoClaimsChat(provider: Provider, externalChatId: string): Promise<string | null>;
 };
 
 export function createChannelBindingRepo(paths: Paths, runtimeId: string): ChannelBindingRepo {
@@ -64,7 +69,10 @@ export function createChannelBindingRepo(paths: Paths, runtimeId: string): Chann
         return [];
       }
       const out: ChannelBinding[] = [];
-      for (const provider of providers) {
+      for (const rawProvider of providers) {
+        const parsedProvider = ProviderSchema.safeParse(rawProvider);
+        if (!parsedProvider.success) continue;
+        const provider = parsedProvider.data;
         let bindings: string[] = [];
         try {
           bindings = await readdir(path.posix.join(root, provider));

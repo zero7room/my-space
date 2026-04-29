@@ -1,11 +1,12 @@
 import { createChannelBindingRepo } from "../repositories/channel-binding-repo.js";
+import type { Provider } from "../schema/channel.js";
 import type { Paths } from "../storage/paths.js";
 import type { BindingLookup } from "./webhook-handler.js";
 
 export type BindingLookupDeps = {
-  resolveUserByExternalId: (provider: string, externalUserId: string) => Promise<string>;
+  resolveUserByExternalId: (provider: Provider, externalUserId: string) => Promise<string>;
   createGuardianThread: (
-    provider: string,
+    provider: Provider,
     userId: string,
     externalConversationType: "dm" | "group" | "topic",
     externalConversationId: string,

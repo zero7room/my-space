@@ -5,6 +5,7 @@ import type { PlanRepo } from "../repositories/plan-repo.js";
 import type { TaskRepo } from "../repositories/task-repo.js";
 import type { ThreadRepo } from "../repositories/thread-repo.js";
 import type { TranscriptRepo } from "../repositories/transcript-repo.js";
+import type { Provider } from "../schema/channel.js";
 import type { Paths } from "../storage/paths.js";
 import { mountActionApi } from "./action-api.js";
 import { mountArtifactApi } from "./artifact-api.js";
@@ -19,7 +20,7 @@ import { mountTranscriptApi } from "./transcript-api.js";
 export type AdminApiOptions = {
   adminToken: string;
   channelStore: ChannelConfigStore;
-  onChannelConfigChanged?: (provider: string) => void | Promise<void>;
+  onChannelConfigChanged?: (provider: Provider) => void | Promise<void>;
   threadRepo?: ThreadRepo;
   taskRepo?: TaskRepo;
   planRepo?: PlanRepo;

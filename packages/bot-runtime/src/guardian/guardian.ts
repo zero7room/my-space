@@ -1,10 +1,11 @@
 // packages/bot-runtime/src/guardian/guardian.ts
 import type { ChannelBindingRepo } from "../repositories/channel-binding-repo.js";
+import type { Provider } from "../schema/channel.js";
 import type { Paths } from "../storage/paths.js";
 import type { GuardianCommand } from "./command-parser.js";
 
 export type GuardianHandleInput = {
-  provider: string;
+  provider: Provider;
   externalConversationId: string;
   externalConversationType: "dm" | "group" | "topic";
   userId: string;

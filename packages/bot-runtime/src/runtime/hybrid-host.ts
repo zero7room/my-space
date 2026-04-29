@@ -19,6 +19,7 @@ import type { LlmClient } from "../llm/client.js";
 import { parseFeishuConfig, resolveFeishuSecrets } from "../providers/feishu/config.js";
 import { createFeishuProviderFromConfig } from "../providers/feishu/factory.js";
 import type { TenantTokenFetchResult } from "../providers/feishu/token-cache.js";
+import type { Provider } from "../schema/channel.js";
 import { type ReleaseLock, acquireInstanceLock } from "../storage/lock.js";
 import type { Paths } from "../storage/paths.js";
 import { type MasterHost, createMasterHost } from "./master-host.js";
@@ -115,7 +116,7 @@ export async function createHybridHost(input: CreateHybridHostInput): Promise<Hy
     threadRepo: master.threadRepo,
   });
 
-  async function rebuildProvider(provider: string): Promise<void> {
+  async function rebuildProvider(provider: Provider): Promise<void> {
     const raw = await channelStore.loadRaw(provider);
     if (!raw || !raw.enabled) {
       if (registry.get(provider) !== null) {

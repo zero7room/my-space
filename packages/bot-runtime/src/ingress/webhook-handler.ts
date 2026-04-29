@@ -2,12 +2,13 @@
 import type { InboundEventRepo } from "../channel/inbound-event-repo.js";
 import type { ProviderRegistry } from "../channel/provider-registry.js";
 import type { NormalizedInbound } from "../channel/provider.js";
+import { type Provider, ProviderSchema } from "../schema/channel.js";
 import type { ThreadLoopResult } from "../thread-loop/thread-loop.js";
 
-export type ConfigResolver = (provider: string) => Promise<{ secret: string } | null>;
+export type ConfigResolver = (provider: Provider) => Promise<{ secret: string } | null>;
 
 export type BindingLookup = (
-  provider: string,
+  provider: Provider,
   externalConversationId: string,
   externalConversationType: "dm" | "group" | "topic",
   externalUserId: string,
@@ -56,12 +57,19 @@ export function createWebhookHandler(opts: {
   configResolver: ConfigResolver;
 }): WebhookHandler {
   return async (req) => {
-    const provider = opts.registry.get(req.provider);
-    if (!provider) return { status: 404, body: { error: "provider not registered" } };
-    const cfg = await opts.configResolver(req.provider);
+    // Parse at the boundary: unknown HTTP input → validated Provider union
+    const parsedProvider = ProviderSchema.safeParse(req.provider);
+    if (!parsedProvider.success) {
+      return { status: 404, body: { error: "provider not registered" } };
+    }
+    const validProvider: Provider = parsedProvider.data;
+
+    const providerImpl = opts.registry.get(validProvider);
+    if (!providerImpl) return { status: 404, body: { error: "provider not registered" } };
+    const cfg = await opts.configResolver(validProvider);
     if (!cfg) return { status: 412, body: { error: "provider not configured" } };
 
-    const verified = await provider.verifyInbound({
+    const verified = await providerImpl.verifyInbound({
       headers: req.headers,
       rawBody: req.rawBody,
       secret: cfg.secret,
@@ -81,26 +89,26 @@ export function createWebhookHandler(opts: {
       return { status: 200, body: { challenge } };
     }
 
-    const normalized = await provider.normalizeInbound(decoded);
+    const normalized = await providerImpl.normalizeInbound(decoded);
     if (!normalized) return { status: 200, body: { ok: true } };
 
-    if (await opts.inboundRepo.isDuplicate(req.provider, normalized.externalEventId)) {
+    if (await opts.inboundRepo.isDuplicate(validProvider, normalized.externalEventId)) {
       return { status: 200, body: { ok: true, duplicate: true } };
     }
-    await opts.inboundRepo.recordReceived(req.provider, normalized.externalEventId, {
+    await opts.inboundRepo.recordReceived(validProvider, normalized.externalEventId, {
       ...(normalized.externalMessageId !== undefined && {
         externalMessageId: normalized.externalMessageId,
       }),
     });
 
     const binding = await opts.lookupBinding(
-      req.provider,
+      validProvider,
       normalized.externalConversationId,
       normalized.externalConversationType,
       normalized.externalUserId,
     );
     if (!binding) {
-      await opts.inboundRepo.markSkipped(req.provider, normalized.externalEventId, "no-binding");
+      await opts.inboundRepo.markSkipped(validProvider, normalized.externalEventId, "no-binding");
       return { status: 200, body: { ok: true, skipped: "no-binding" } };
     }
 
@@ -109,7 +117,7 @@ export function createWebhookHandler(opts: {
         threadId: binding.threadId,
         messageId: normalized.externalMessageId ?? `ext-${normalized.externalEventId}`,
         fromUserId: binding.userId,
-        source: sourceFor(req.provider, normalized.externalConversationType),
+        source: sourceFor(validProvider, normalized.externalConversationType),
         bound: binding.bound,
         mentionsBot: normalized.mentionsBot,
         replyToBotMessage: normalized.replyToBotMessage,
@@ -117,11 +125,11 @@ export function createWebhookHandler(opts: {
         messageText: normalized.text,
         at: normalized.receivedAt,
       });
-      await opts.inboundRepo.markProcessed(req.provider, normalized.externalEventId);
+      await opts.inboundRepo.markProcessed(validProvider, normalized.externalEventId);
       return { status: 200, body: { ok: true } };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      await opts.inboundRepo.markFailed(req.provider, normalized.externalEventId, message);
+      await opts.inboundRepo.markFailed(validProvider, normalized.externalEventId, message);
       return { status: 500, body: { error: message } };
     }
   };

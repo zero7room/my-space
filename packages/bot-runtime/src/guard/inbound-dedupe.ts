@@ -1,10 +1,11 @@
+import type { Provider } from "../schema/channel.js";
 import { readJson, writeJson } from "../storage/json-file.js";
 import type { Paths } from "../storage/paths.js";
 
 export async function isDuplicateInboundEvent(
   paths: Paths,
   runtimeId: string,
-  provider: string,
+  provider: Provider,
   externalEventId: string,
 ): Promise<boolean> {
   const file = paths.webhookEvent(runtimeId, provider, externalEventId);
@@ -15,7 +16,7 @@ export async function isDuplicateInboundEvent(
 export async function recordInboundEvent(
   paths: Paths,
   runtimeId: string,
-  provider: string,
+  provider: Provider,
   externalEventId: string,
   payload: unknown,
 ): Promise<void> {

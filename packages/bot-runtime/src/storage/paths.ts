@@ -1,4 +1,5 @@
 import path from "node:path";
+import type { Provider } from "../schema/channel.js";
 
 export type JobStatus = "pending" | "locked" | "done" | "failed" | "dedupe";
 
@@ -29,10 +30,10 @@ export type Paths = {
   outputsArchive(runtimeId: string, threadId: string, taskId: string, revisionId: string): string;
   jobsDir(runtimeId: string, status: JobStatus): string;
   jobFile(runtimeId: string, status: JobStatus, jobId: string): string;
-  channelConfig(runtimeId: string, channelType: string): string;
-  binding(runtimeId: string, threadId: string, channelType: string, bindingId: string): string;
-  chatClaim(runtimeId: string, channelType: string, externalChatId: string): string;
-  webhookEvent(runtimeId: string, channelType: string, eventId: string): string;
+  channelConfig(runtimeId: string, channelType: Provider): string;
+  binding(runtimeId: string, threadId: string, channelType: Provider, bindingId: string): string;
+  chatClaim(runtimeId: string, channelType: Provider, externalChatId: string): string;
+  webhookEvent(runtimeId: string, channelType: Provider, eventId: string): string;
   criticalNodePolicy(runtimeId: string, policyId: string): string;
 };
 

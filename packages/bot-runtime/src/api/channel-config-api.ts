@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { ChannelConfigStore } from "../channel/config-store.js";
 import type { IngressServer } from "../ingress/http-server.js";
+import type { Provider } from "../schema/channel.js";
 
 const UpsertSchema = z.object({
   enabled: z.boolean(),
@@ -15,7 +16,7 @@ const UpsertSchema = z.object({
 export type ChannelConfigApiOptions = {
   store: ChannelConfigStore;
   adminToken: string;
-  onConfigChanged?: (provider: string) => void | Promise<void>;
+  onConfigChanged?: (provider: Provider) => void | Promise<void>;
 };
 
 function checkAdmin(headers: Record<string, string | string[] | undefined>, expected: string) {

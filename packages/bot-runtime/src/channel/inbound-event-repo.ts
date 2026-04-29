@@ -1,4 +1,8 @@
-import { type ChannelInboundEvent, ChannelInboundEventSchema } from "../schema/channel.js";
+import {
+  type ChannelInboundEvent,
+  ChannelInboundEventSchema,
+  type Provider,
+} from "../schema/channel.js";
 import { newId } from "../storage/ids.js";
 import { readJson, writeJson } from "../storage/json-file.js";
 import type { Paths } from "../storage/paths.js";
@@ -9,32 +13,32 @@ export type RecordReceivedInput = {
 
 export type InboundEventRepo = {
   recordReceived(
-    provider: string,
+    provider: Provider,
     externalEventId: string,
     input: RecordReceivedInput,
   ): Promise<ChannelInboundEvent>;
-  isDuplicate(provider: string, externalEventId: string): Promise<boolean>;
-  load(provider: string, externalEventId: string): Promise<ChannelInboundEvent | null>;
-  markProcessed(provider: string, externalEventId: string): Promise<ChannelInboundEvent>;
+  isDuplicate(provider: Provider, externalEventId: string): Promise<boolean>;
+  load(provider: Provider, externalEventId: string): Promise<ChannelInboundEvent | null>;
+  markProcessed(provider: Provider, externalEventId: string): Promise<ChannelInboundEvent>;
   markSkipped(
-    provider: string,
+    provider: Provider,
     externalEventId: string,
     reason: string,
   ): Promise<ChannelInboundEvent>;
   markFailed(
-    provider: string,
+    provider: Provider,
     externalEventId: string,
     reason: string,
   ): Promise<ChannelInboundEvent>;
 };
 
 export function createInboundEventRepo(paths: Paths, runtimeId: string): InboundEventRepo {
-  function file(provider: string, externalEventId: string) {
+  function file(provider: Provider, externalEventId: string) {
     return paths.webhookEvent(runtimeId, provider, externalEventId);
   }
 
   async function transition(
-    provider: string,
+    provider: Provider,
     externalEventId: string,
     next: ChannelInboundEvent["status"],
     extra: Partial<ChannelInboundEvent> = {},

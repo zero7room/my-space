@@ -1,6 +1,11 @@
 import { mkdir, readdir } from "node:fs/promises";
 import path from "node:path";
-import { type ChannelConfig, ChannelConfigSchema, ProviderSchema } from "../schema/channel.js";
+import {
+  type ChannelConfig,
+  ChannelConfigSchema,
+  type Provider,
+  ProviderSchema,
+} from "../schema/channel.js";
 import { readJson, writeJson } from "../storage/json-file.js";
 import type { Paths } from "../storage/paths.js";
 
@@ -23,8 +28,8 @@ export type UpsertChannelConfigInput = {
 
 export type ChannelConfigStore = {
   upsert(provider: string, input: UpsertChannelConfigInput): Promise<ChannelConfig>;
-  loadRaw(provider: string): Promise<ChannelConfig | null>;
-  loadSanitized(provider: string): Promise<SanitizedChannelConfig | null>;
+  loadRaw(provider: Provider): Promise<ChannelConfig | null>;
+  loadSanitized(provider: Provider): Promise<SanitizedChannelConfig | null>;
   list(): Promise<SanitizedChannelConfig[]>;
 };
 
@@ -81,8 +86,9 @@ export function createChannelConfigStore(paths: Paths, runtimeId: string): Chann
       const out: SanitizedChannelConfig[] = [];
       for (const f of files) {
         if (!f.endsWith(".json")) continue;
-        const provider = f.replace(/\.json$/, "");
-        const got = await this.loadSanitized(provider);
+        const parsed = ProviderSchema.safeParse(f.replace(/\.json$/, ""));
+        if (!parsed.success) continue;
+        const got = await this.loadSanitized(parsed.data);
         if (got) out.push(got);
       }
       return out;
