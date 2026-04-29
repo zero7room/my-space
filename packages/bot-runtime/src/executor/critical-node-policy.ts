@@ -23,10 +23,12 @@ export function evaluateCriticalNode(input: EvaluateInput): CriticalNodeDecision
       hit = true;
       reason = `tool name match: ${m.toolName}`;
     } else if (m.kind === "external_io") {
-      const direction = (input.input as { direction?: string }).direction;
-      if (direction === "outbound") {
-        hit = true;
-        reason = "external outbound io";
+      const io = input.input as { direction?: string; provider?: string };
+      if (io.direction === "outbound") {
+        if (m.provider === undefined || m.provider === io.provider) {
+          hit = true;
+          reason = m.provider ? `external outbound io via ${m.provider}` : "external outbound io";
+        }
       }
     } else if (m.kind === "filesystem") {
       const fs = (input.input as { fsImpact?: { op?: string; count?: number } }).fsImpact;
