@@ -7,4 +7,10 @@ describe("runMessageGuardEval (stub mode)", () => {
     expect(result.total).toBeGreaterThan(0);
     expect(result.passRate).toBeGreaterThan(0.9);
   });
+
+  it("stub mode hits ≥0.95 passRate over the full 200-sample set", async () => {
+    const result = await runMessageGuardEval({ mode: "stub" });
+    expect(result.total).toBeGreaterThanOrEqual(180);
+    expect(result.passRate).toBeGreaterThanOrEqual(0.95);
+  }, 30000);
 });

@@ -5,24 +5,31 @@ import { writeEvalResult } from "./result-writer.js";
 import type { EvalResult } from "./runner.js";
 import { runTaskConfirmationEval } from "./task-confirmation-eval.js";
 
-const EVALS = {
-  "message-guard": runMessageGuardEval,
-  "task-confirmation": runTaskConfirmationEval,
-  "plan-revision": runPlanRevisionEval,
-} as const;
+type EvalName = "message-guard" | "task-confirmation" | "plan-revision";
 
-type EvalName = keyof typeof EVALS;
+const apiKey = process.env.ANTHROPIC_API_KEY;
+
+async function runWithAuto(name: string): Promise<EvalResult<unknown, unknown>> {
+  if (name === "message-guard") {
+    return apiKey
+      ? runMessageGuardEval({ mode: "live", apiKey })
+      : runMessageGuardEval({ mode: "stub" });
+  }
+  // task-confirmation and plan-revision still go through stubs (Tasks 10, 13 wire those)
+  if (name === "task-confirmation") return runTaskConfirmationEval();
+  if (name === "plan-revision") return runPlanRevisionEval();
+  throw new Error(`unknown eval ${name}`);
+}
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const evalIdx = args.indexOf("--eval");
   const evalName = evalIdx >= 0 ? args[evalIdx + 1] : null;
-  if (!evalName || !(evalName in EVALS)) {
-    console.error(`usage: --eval <${Object.keys(EVALS).join("|")}>`);
+  if (!evalName || !["message-guard", "task-confirmation", "plan-revision"].includes(evalName)) {
+    console.error("usage: --eval <message-guard|task-confirmation|plan-revision>");
     process.exit(2);
   }
-  const fn = EVALS[evalName as EvalName] as () => Promise<EvalResult<unknown, unknown>>;
-  const result = await fn();
+  const result = await runWithAuto(evalName);
   const file = await writeEvalResult({
     rootDir: path.posix.join("tests", "evals", "results"),
     evalName: evalName as EvalName,

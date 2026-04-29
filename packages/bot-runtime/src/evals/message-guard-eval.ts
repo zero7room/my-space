@@ -2,6 +2,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import { createMessageGuard } from "../guard/message-guard.js";
+import { createAnthropicLlmClient } from "../llm/anthropic.js";
 import { createStubLlmClient } from "../llm/client.js";
 import { type EvalResult, runEval } from "./runner.js";
 import { type EvalSample, createSampleSchema, loadSamples } from "./sample.js";
@@ -51,7 +52,31 @@ export async function runMessageGuardEval(
   if (args.limit !== undefined) samples = samples.slice(0, args.limit);
 
   if (args.mode === "live") {
-    throw new Error("live mode not implemented yet (Task 7 wires it)");
+    const llm = createAnthropicLlmClient({
+      apiKey: args.apiKey,
+      model: "claude-haiku-4-5-20251001",
+      maxTokens: 256,
+    });
+    const guard = createMessageGuard({ llm });
+
+    return runEval({
+      samples,
+      evaluate: async (input) => {
+        const decision = await guard.classify({
+          source: input.source as never,
+          bound: input.bound,
+          mentionsBot: input.mentionsBot,
+          replyToBotMessage: input.replyToBotMessage,
+          slashCommand: input.slashCommand as never,
+          threadStatus: input.threadStatus as never,
+          messageText: input.messageText,
+          pendingTaskId: undefined,
+          pendingPlanId: undefined,
+        });
+        return { intent: decision.intent, shortCircuited: decision.shortCircuited };
+      },
+      score: (expected, actual) => expected.intent === actual.intent,
+    });
   }
 
   // Stub mode: canned LLM answers keyed by the exact last user message content
