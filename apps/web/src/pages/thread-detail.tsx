@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useAppContext } from "../app-context.js";
+import { ArtifactPanel } from "../components/artifact-panel.js";
 import { ConversationPanel } from "../components/conversation-panel.js";
 import { TaskPlanPanel } from "../components/task-plan-panel.js";
 import { useEventStream } from "../hooks/use-event-stream.js";
@@ -55,7 +56,7 @@ export function ThreadDetail() {
       </div>
       <div className="panel right">
         <h4>Artifacts</h4>
-        <div>(Artifact panel — Task 21)</div>
+        {tasks[0] && id && <ArtifactPanel taskId={tasks[0].id} threadId={id} />}
       </div>
     </div>
   );
