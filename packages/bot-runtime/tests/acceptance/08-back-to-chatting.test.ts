@@ -4,20 +4,9 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createStubLlmClient } from "../../src/llm/client.js";
 import { createHybridHost } from "../../src/runtime/hybrid-host.js";
-import { createPaths } from "../../src/storage/paths.js";
 import { newId } from "../../src/storage/ids.js";
+import { createPaths } from "../../src/storage/paths.js";
 import { recordCovered, resetForTests } from "./_harness.js";
-
-// NOTE (v1 gap): The executor (worker-pool / executor.ts) only updates taskRepo
-// when a task completes — it does NOT call threadRepo.update to reset
-// thread.status from "working" back to "chatting".  That status reset is a
-// Plan-1 feature that has not yet been wired up in v1.  This test therefore:
-//   1. Asserts the ACTUAL v1 post-completion thread status (still "working").
-//   2. Asserts the more-important user-visible behaviour: the ThreadLoop's
-//      new_task branch does NOT guard on thread.status, so a follow-up
-//      message still creates a new draft.  This proves the thread is
-//      functionally open to new work even without a status reset.
-// When the status-reset is implemented, update assertion 1 to expect "chatting".
 
 let dataRoot: string;
 let host: Awaited<ReturnType<typeof createHybridHost>> | null = null;
@@ -142,14 +131,10 @@ describe("Acceptance C8: thread returns to chatting after task completion", () =
     const completedTask = await host.master.taskRepo.load(taskId);
     expect(completedTask?.status).toBe("completed");
 
-    // ── Assertion 2: v1 post-completion thread status ──
-    // V1 GAP: executor does not reset thread.status → it stays "working".
-    // When the status-reset is wired up, change this assertion to:
-    //   expect(["chatting", "idle"]).toContain(t?.status);
+    // ── Assertion 2: thread status resets to chatting after task completion ──
     const tAfterRun = await host.master.threadRepo.load(thread.id);
     expect(tAfterRun).not.toBeNull();
-    // Document actual v1 behaviour — thread remains "working" post-completion.
-    expect(tAfterRun?.status).toBe("working");
+    expect(["chatting", "idle"]).toContain(tAfterRun?.status);
 
     // ── Assertion 3 (primary): thread accepts a NEW task even while status="working" ──
     // ThreadLoop.new_task branch does not guard on thread.status,

@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createJobQueue } from "../../repositories/job-queue.js";
 import { createPlanRepo } from "../../repositories/plan-repo.js";
 import { createTaskRepo } from "../../repositories/task-repo.js";
+import { createThreadRepo } from "../../repositories/thread-repo.js";
 import { createPaths } from "../../storage/paths.js";
 import { createDispatcher } from "../../tools/dispatcher.js";
 import { runWorkerPoolOnce } from "../worker-pool.js";
@@ -27,6 +28,7 @@ describe("WorkerPool runWorkerPoolOnce", () => {
     const paths = createPaths(dataRoot);
     const taskRepo = createTaskRepo(paths, "rt-1");
     const planRepo = createPlanRepo(paths, "rt-1");
+    const threadRepo = createThreadRepo(paths, "rt-1");
     const jobs = createJobQueue(paths, "rt-1");
     const t = await taskRepo.createDraft({
       threadId: ids.th,
@@ -58,6 +60,7 @@ describe("WorkerPool runWorkerPoolOnce", () => {
       executorIdPrefix: "ex",
       taskRepo,
       planRepo,
+      threadRepo,
       jobs,
       dispatcher: createDispatcher({ tools: [], policies: [] }),
       llm: {
@@ -78,6 +81,7 @@ describe("WorkerPool runWorkerPoolOnce", () => {
     const paths = createPaths(dataRoot);
     const taskRepo = createTaskRepo(paths, "rt-1");
     const planRepo = createPlanRepo(paths, "rt-1");
+    const threadRepo = createThreadRepo(paths, "rt-1");
     const jobs = createJobQueue(paths, "rt-1");
     const result = await runWorkerPoolOnce({
       paths,
@@ -85,6 +89,7 @@ describe("WorkerPool runWorkerPoolOnce", () => {
       executorIdPrefix: "ex",
       taskRepo,
       planRepo,
+      threadRepo,
       jobs,
       dispatcher: createDispatcher({ tools: [], policies: [] }),
       llm: {

@@ -4,6 +4,7 @@ import type { LlmClient } from "../llm/client.js";
 import { type JobQueue, createJobQueue } from "../repositories/job-queue.js";
 import { type PlanRepo, createPlanRepo } from "../repositories/plan-repo.js";
 import { type TaskRepo, createTaskRepo } from "../repositories/task-repo.js";
+import { type ThreadRepo, createThreadRepo } from "../repositories/thread-repo.js";
 import { type ReleaseLock, acquireInstanceLock } from "../storage/lock.js";
 import { type Paths, createPaths } from "../storage/paths.js";
 import { type Dispatcher, createDispatcher } from "../tools/dispatcher.js";
@@ -22,6 +23,7 @@ export type CreateWorkerHostInput = {
 export type WorkerHost = {
   taskRepo: TaskRepo;
   planRepo: PlanRepo;
+  threadRepo: ThreadRepo;
   jobs: JobQueue;
   dispatcher: Dispatcher;
   runOnce(): Promise<Awaited<ReturnType<typeof runWorkerPoolOnce>>>;
@@ -38,6 +40,7 @@ export async function createWorkerHost(input: CreateWorkerHostInput): Promise<Wo
 
   const taskRepo = createTaskRepo(input.paths, input.runtimeId);
   const planRepo = createPlanRepo(input.paths, input.runtimeId);
+  const threadRepo = createThreadRepo(input.paths, input.runtimeId);
   const jobs = createJobQueue(input.paths, input.runtimeId);
   const tools = createDefaultToolRegistry({
     paths: input.paths,
@@ -49,6 +52,7 @@ export async function createWorkerHost(input: CreateWorkerHostInput): Promise<Wo
   return {
     taskRepo,
     planRepo,
+    threadRepo,
     jobs,
     dispatcher,
     async runOnce() {
@@ -58,6 +62,7 @@ export async function createWorkerHost(input: CreateWorkerHostInput): Promise<Wo
         executorIdPrefix: "ex",
         taskRepo,
         planRepo,
+        threadRepo,
         jobs,
         dispatcher,
         llm: input.llm,

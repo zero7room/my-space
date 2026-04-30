@@ -2,6 +2,7 @@ import type { LlmClient } from "../llm/client.js";
 import type { JobQueue } from "../repositories/job-queue.js";
 import type { PlanRepo } from "../repositories/plan-repo.js";
 import type { TaskRepo } from "../repositories/task-repo.js";
+import type { ThreadRepo } from "../repositories/thread-repo.js";
 import { newId } from "../storage/ids.js";
 import type { Paths } from "../storage/paths.js";
 import type { Dispatcher } from "../tools/dispatcher.js";
@@ -13,6 +14,7 @@ export type WorkerPoolOnceInput = {
   executorIdPrefix: string;
   taskRepo: TaskRepo;
   planRepo: PlanRepo;
+  threadRepo: ThreadRepo;
   jobs: JobQueue;
   dispatcher: Dispatcher;
   llm: LlmClient;
@@ -66,6 +68,12 @@ export async function runWorkerPoolOnce(
       completion.error = result.error;
     }
     await input.jobs.complete(leased.id, completion);
+
+    // Reset thread status back to "chatting" now that the task has reached a terminal state.
+    const task = await input.taskRepo.load(leased.taskId);
+    if (task) {
+      await input.threadRepo.update(task.threadId, { status: "chatting" }).catch(() => undefined);
+    }
   } else {
     /* awaiting_critical_node / blocked: keep job in locked, ThreadLoop will revise/cancel */
   }

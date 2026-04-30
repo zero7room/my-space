@@ -1353,7 +1353,6 @@ git commit -m "docs(plan-4): v1 final wrap-up and Plan 5+ outlook"
 
 | Gap | 位置 | 建议 |
 |---|---|---|
-| Task 完成后 thread.status 不自动 reset 回 chatting / idle | `executor.ts` 写完 `executor_finished` 但没回写 thread.status | v1.x patch 可补：worker-pool 终结时 `threadRepo.update(threadId, { status: "chatting", activeTaskId: undefined })` |
 | ThreadLoop 没有处理 `plan_update` intent 自动驱动 supersedeWithRevision | thread-loop.ts 未实现 plan_update 分支 | v2 候选；v1 通过直接调用 repo 实现 acceptance |
 | CriticalNodePolicy 真正的"长寿 evaluator 自动重读" 不存在 | evaluator 是无状态函数，每次调用都 listEnabled() | v1 设计如此（每次 tool call 都重读，没有缓存 → 实际上效果等同热重载） |
 
@@ -1411,7 +1410,7 @@ git commit -m "docs(plan-4): v1 final wrap-up and Plan 5+ outlook"
 | C5 | runtime 开始执行 active task | ✅ covered | tests/acceptance/05-runtime-executes.test.ts |
 | C6 | 客户端能看到 task/plan/log/artifact | ✅ covered | tests/acceptance/06-client-visibility.test.ts |
 | C7 | 执行中变更生成 revision | ✅ covered | tests/acceptance/07-revise-during-execution.test.ts |
-| C8 | task 完成后回到沟通状态 | ⚠ covered with v1 gap doc | tests/acceptance/08-back-to-chatting.test.ts |
+| C8 | task 完成后回到沟通状态 | ✅ covered | tests/acceptance/08-back-to-chatting.test.ts |
 | C9 | runtime 重启数据不丢 | ✅ covered | tests/acceptance/09-restart-no-data-loss.test.ts |
 | C10 | webhook event_id 幂等 | ✅ covered-by-reference | tests/integration/feishu-webhook-idempotent.test.ts (Plan 2) |
 | C11 | kill -9 后 60s 内恢复 | ✅ covered（实测 < 30ms） | tests/acceptance/11-crash-recovery-within-60s.test.ts |
@@ -1425,14 +1424,12 @@ git commit -m "docs(plan-4): v1 final wrap-up and Plan 5+ outlook"
 - prompt 版本化与 A/B
 - 模型路由 / fallback / 速率限制
 - Agent eval CI 自动化（v1 仅本地手动跑）
-- C8 thread-status 自动 reset 修复（小 patch 即可）
 - ThreadLoop `plan_update` intent → 自动调 supersedeWithRevision 的 wiring
 - 关键节点策略图形化配置 UI
 - 国际化
 - 数据保留与清理（GDPR / 磁盘满）
 
 **v1 ready-to-merge 路径建议：**
-1. 在 `plan-4-eval` 分支上补一行 fix C8 gap：在 `worker-pool.ts` 终结路径写 `threadRepo.update(threadId, { status: "chatting", activeTaskId: undefined })`。
-2. Push 4 个 plan 分支到 remote。
-3. 4 个 PR 顺序合并到 main：`plan-1-runtime-core` → `plan-2-channels` → `plan-3-client` → `plan-4-eval`。
-4. main 打 tag `v1.0.0`。
+1. Push 4 个 plan 分支到 remote。
+2. 4 个 PR 顺序合并到 main：`plan-1-runtime-core` → `plan-2-channels` → `plan-3-client` → `plan-4-eval`。
+3. main 打 tag `v1.0.0`。
