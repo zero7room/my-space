@@ -32,6 +32,7 @@
 - 第 21 章：工程默认值清单。
 - 第 22 章：与参考项目的复用映射。
 - 第 23 章：第一版落地范围与风险。
+- 第 24 章：Agent Teams（协作原语、工具协议、状态机、崩溃恢复、客户端契约）。
 - 附录：命名一致性约定、决策卡片速查。
 
 ---
@@ -763,6 +764,138 @@ type RuntimeRegistration = {
 }
 ```
 
+### 7.12 Team
+
+```ts
+type Team = {
+ id: string
+ parentTaskId: string
+ parentExecutorId: string               // lead 身份 = 派生时的 Executor id
+ threadId: string                       // 冗余,便于 SSE / 审计
+ status:
+   | "forming"
+   | "active"
+   | "finishing"
+   | "completed"
+   | "failed"
+   | "cancelled"
+ roster: TeamRosterSlot[]
+ budget: TeamBudget                     // 硬约束:必须 ≤ 父 task 剩余 budget
+ summary?: TeamSummaryRef               // completed / failed 时写
+ schemaVersion: 1
+ createdAt: string
+ updatedAt: string
+}
+
+type TeamBudget = {
+ maxDurationMs: number                  // 默认继承父 task maxDurationMs / 2
+ maxTokens: number                      // 默认继承父 task maxTokens / 2
+ maxTeammates: number                   // 默认 4,硬上限 8
+ maxWorkItems: number                   // 默认 32
+ maxMessages: number                    // 默认 200
+}
+
+type TeamSummaryRef = {
+ outcome: "completed" | "failed" | "cancelled"
+ summaryText: string                    // LLM 合成的 aggregate summary,经脱敏
+ harvestedOutputIds: string[]           // 汇入父 task 的 outputs 引用
+}
+```
+
+落盘位置:`state/threads/<thread-id>/tasks/<task-id>/teams/<team-id>/team.json`。schemaVersion 从 1 起,新功能无历史数据,不走一次性迁移。
+
+### 7.13 TeamRosterSlot
+
+```ts
+type TeamRosterSlot = {
+ slotId: string
+ slotName: string                       // 例 "researcher" / "coder-1"
+ persona?: string                       // skills 体系里的 persona 名,可选
+ skillAllowlist?: string[]              // 默认继承父 task 的 skill set
+ preferredRoles?: string[]              // work item claim 时用于 role-match
+ maxConcurrentClaims: number            // 默认 1
+ teammateId?: string                    // 一旦 spawn 写入
+ status: "pending" | "spawned" | "idle" | "working" | "finished" | "failed"
+}
+```
+
+### 7.14 TeamWorkItem
+
+```ts
+type TeamWorkItem = {
+ id: string
+ teamId: string
+ description: string                    // 写盘前经 §18.4 sanitize
+ preferredRole?: string
+ priority: number                       // 默认 0,越大越先
+ status: "available" | "claimed" | "completed" | "failed" | "cancelled"
+ claimedByTeammateId?: string
+ claimedAt?: string
+ claimLeaseExpireAt?: string            // claim 有 lease,60s,到期自动 release
+ claimFencingToken?: number             // 来源:team 目录的 _message-seq
+ attemptCount: number                   // 每次 claim release 后 +1
+ maxReclaims: number                    // 默认 2,超过转 failed
+ resultRef?: string                     // outputs/ 或 teammate events.jsonl 指针
+ failureClass?: "transient_error" | "assertion_error" | "permission_error" | "cancelled"
+ createdAt: string
+ updatedAt: string
+}
+```
+
+落盘位置由 status 决定:`work-items/available/<id>.json` / `claimed/<id>.json` / `done/<id>.json` / `failed/<id>.json`,通过原子 rename 迁移（复用 §10.1 jobs 三态目录模型）。
+
+### 7.15 TeamMessage
+
+```ts
+type TeamMessage = {
+ id: string                             // 每 team 内单调递增,由 _message-seq fencing
+ teamId: string
+ from: "lead" | "system" | { teammateId: string }
+ to: "broadcast" | "lead" | { teammateId: string }
+ kind: "chat" | "handoff" | "directive" | "status" | "result_link"
+ content: string                        // 写盘前经 §18.4 sanitize
+ referencedWorkItemIds?: string[]
+ at: string
+}
+```
+
+落盘位置:`teams/<team-id>/messages.jsonl`(append-only)。
+
+### 7.16 Teammate
+
+```ts
+type Teammate = {
+ id: string
+ teamId: string
+ slotId: string
+ runtimeActorId: string                 // 进程内 actor 句柄,重启后重建
+ status:
+   | "spawning"
+   | "idle"
+   | "working"
+   | "paused"
+   | "awaiting_critical_node"
+   | "finished"
+   | "failed"
+   | "cancelled"
+ currentWorkItemId?: string
+ lastMessageCursor?: string             // 上次 read_messages 读到的 id
+ budget: TeammateBudget                 // 硬约束:必须 ≤ team.budget / roster.length
+ summary?: string                       // finished / failed 时写,经脱敏
+ schemaVersion: 1
+ createdAt: string
+ updatedAt: string
+}
+
+type TeammateBudget = {
+ maxDurationMs: number
+ maxTokens: number
+ maxSubagents: number                   // teammate 仍可派 subagent,但不可派 team
+}
+```
+
+落盘位置:`teams/<team-id>/teammates/<teammate-id>/teammate.json`。
+
 ---
 
 ## 8. 文件系统结构
@@ -802,6 +935,30 @@ data/
  uploads/
  outputs/
  _archive/<revision-id>/ # 旧 artifact 归档
+ teams/
+ <team-id>/
+ team.json # Team 元数据 + roster + budget
+ _message-seq # 单调整数,fencing TeamMessage.id
+ team-events.jsonl # team 级事件汇聚(append-only)
+ messages.jsonl # TeamMessage 广播总线(append-only)
+ work-items/
+ available/<item-id>.json # 待认领
+ claimed/<item-id>.json # 已认领,含 claimedBy + leaseExpireAt + fencingToken
+ done/<item-id>.json # 完成态
+ failed/<item-id>.json # 失败态
+ _index.json # 扫描加速索引(可选)
+ teammates/
+ <teammate-id>/
+ teammate.json # Teammate 元数据
+ events.jsonl # teammate 自己的事件流
+ control.json # lead → teammate 信号通道
+ context/ # teammate 独立 LLM 上下文
+ workspace/ # teammate 私有 workspace
+ uploads/
+ outputs/ # teammate 产物;汇入 team 时按 result_link 引用
+ _archive/ # team 归档(jsonl 流与目录级)
+ team-events.<archive-id>.jsonl.gz
+ messages.<archive-id>.jsonl.gz
  bindings/
  <thread-id>/<channel-type>/<binding-id>/
  active.json
@@ -832,6 +989,7 @@ data/
 - 不维护独立 TaskQueue 目录：`tasks/<task-id>/task.json` 是 single source of truth；调度从扫描派生。
 - task 级上下文与 thread 级上下文分目录（`tasks/<task-id>/context/` vs `threads/<thread-id>/context/`）。
 - 旧 artifact 归档在 `outputs/_archive/<revision-id>/`。
+- Team 子树寄生在父 task 目录（`tasks/<task-id>/teams/<team-id>/`），team 终态后 30 天由独立清理 fiber 搬到 `_archive/teams/<team-id>/`（目录级 `.tar.gz`）。
 
 ---
 
@@ -918,6 +1076,106 @@ Task 状态机不变量：
 
 不满足时 Executor 不启动，ThreadLoop 继续澄清或等待确认。
 
+### 9.5 Team 状态机
+
+```mermaid
+stateDiagram-v2
+ [*] --> forming: team 工具调用创建
+ forming --> active: 所有 teammate spawn 完成 & roster status=idle
+ forming --> failed: spawn 失败（budget 超限 / skill 不可用 / policy block）
+ forming --> cancelled: 父 task 在 forming 期间收到 cancel
+ active --> finishing: lead 调 finish_team / 所有 work item done / budget 超限
+ active --> cancelled: 父 task cancel 级联
+ finishing --> completed: 所有 teammate 终态，outcome 积极
+ finishing --> failed: 所有 teammate 终态但存在未 complete 的 work item 且 lead 标 failed
+ finishing --> cancelled: 清场期间父 task cancel
+ completed --> [*]
+ failed --> [*]
+ cancelled --> [*]
+```
+
+Team 状态机不变量：
+
+- `completed / failed / cancelled` 是吸收态。
+- Team **没有 retry 概念**——team 失败直接让父 Executor 在下一轮 LLM 推理中决策（派新 team、降级用 subagent、或 fail 父 task）；不进 §4.7.1 master retry fiber。
+- Team 状态转移写 `team_state_transition{teamId, from, to, reason, actor, at}` 到 team-events.jsonl **和** 父 task events.jsonl。
+- Team 生命周期严格短于父 Task：父 Executor `executor_finished` 前必须 harvest 所有 active team；任何路径不得留下"父 task 终态但 team 仍 active"的状态。
+
+### 9.6 Teammate 状态机
+
+```mermaid
+stateDiagram-v2
+ [*] --> spawning
+ spawning --> idle: actor 启动完成 & context 加载完
+ spawning --> failed: spawn 超时 / skill 加载失败
+ idle --> working: claim_work 成功
+ idle --> finished: team finishing 且无 work item 可 claim
+ idle --> failed: teammate budget 耗尽
+ working --> awaiting_critical_node: policy require_approval 命中
+ awaiting_critical_node --> working: control.json signal=resume
+ awaiting_critical_node --> failed: control.json signal=cancel 且 reason=reject
+ awaiting_critical_node --> cancelled: team-level cancel 级联
+ working --> idle: complete_work / fail_work
+ working --> paused: control.json signal=pause
+ paused --> working: control.json signal=resume
+ paused --> cancelled: control.json signal=cancel
+ working --> cancelled: team cancel 级联（完成当前 tool call 后）
+ finished --> [*]
+ failed --> [*]
+ cancelled --> [*]
+```
+
+Teammate 状态机不变量：
+
+- Teammate `working` 期间收到 team cancel，必须 graceful（完成当前 tool call）再进 `cancelled`，与 §10.3 Executor 合同一致。
+- Teammate transient_error 不往上游级联（§11.2.1 外推）：`fail_work{failureClass=transient_error}` 只把 work item 打回 `failed/`，teammate 自己回到 `idle` 继续 claim；是否 reclaim 由 work item 的 `attemptCount < maxReclaims` 决定。
+- `working → idle` 是本状态机里唯一的回退边，本质是 work-item 粒度的切换，不是 teammate 生命周期的倒退。
+- Teammate `status ∈ {spawning, working, paused, awaiting_critical_node}` 时进程崩溃，重启扫描必须把它标 `failed` 并写 `teammate_recovery_failed{reason:"crash_resume"}`。
+
+### 9.7 TeamWorkItem 状态机
+
+```mermaid
+stateDiagram-v2
+ [*] --> available: publish_work 写入
+ available --> claimed: claim_work 原子 rename
+ claimed --> available: lease 过期 & attemptCount < maxReclaims
+ claimed --> completed: complete_work(resultRef)
+ claimed --> failed: fail_work(failureClass) / attemptCount ≥ maxReclaims
+ available --> cancelled: team cancel / finish_team abort / team budget 超限
+ claimed --> cancelled: 同上（claimed 态触发时优先走 graceful）
+ completed --> [*]
+ failed --> [*]
+ cancelled --> [*]
+```
+
+关键转移事件：
+
+| 事件 kind | 触发点 | 写入位置 |
+|---|---|---|
+| `work_item_published` | publish_work 完成 | team-events.jsonl |
+| `work_item_claimed` | claim_work rename 成功 | team-events.jsonl |
+| `work_item_lease_expired` | reclaim_scanner 发现过期 | team-events.jsonl |
+| `work_item_reclaimed` | rename 回 available 成功 | team-events.jsonl |
+| `work_item_reclaim_exhausted` | attemptCount ≥ maxReclaims | team-events.jsonl |
+| `work_item_completed` | complete_work | team-events.jsonl + teammate events.jsonl |
+| `work_item_failed` | fail_work | 同上 |
+| `work_item_cancelled` | team cancel 级联 | team-events.jsonl |
+
+失败分类传递：
+
+- `failureClass=transient_error` 触发 reclaim（lease 过期或 teammate 主动 `release_claim`）；
+- `assertion_error / permission_error` 直接落 `failed/`，不消耗 reclaim 配额；
+- `cancelled` 记录用户 / 系统原因，不进统计池。
+
+### 9.8 Team 与父 Task 状态机的耦合
+
+父 Task 状态机 §9.1 不改变原有状态枚举，但新增 4 条与 team 相关的耦合规则：
+
+1. **父 task cancel / pause 级联**：父 Executor 收到 `control.json signal=cancel`，先写 team 的 `control.json signal=cancel`，等 team 进 `cancelled` 终态后父 Executor 再 `executor_finished{outcome=cancelled}`。pause 同理，但 team 内部 teammate 仅暂停工具调用，**不释放 claim**（避免 resume 后 work item 漂移）。
+2. **父 task plan_update × active team**：§9.1 中 plan_update 走 `changing` 态。此路径必须**先级联 cancel team**、等 team 进终态、再走验收 40 的 PlanRevision 事务（新 PlanRevision + ChangeRecord + retry reset）。顺序由 events.jsonl 时间戳可验证。
+3. **父 task retry**：§9.1 `failed → queued` 自动重试。旧 team 必须在父 task 进 `failed` 前已终态；retry 派发新 job 时旧 team 已不在，新 Executor 从零开始；如果 LLM 决策要重新用 team，会再次调 `team` 工具并生成新 teamId，新 teamId 与旧 team 无关联。
+4. **父 task budget_overflow**：Team budget ≤ 父 task budget 必然保证 team 先于父 task 耗尽；写 `team_budget_exhausted{dim}` + team 转 `failed`；父 task 按原 budget_overflow 路径走 `failed + blockedReason=retry_exhausted`。
+
 ---
 
 ## 10. ThreadLoop ↔ Executor 通信协议
@@ -983,6 +1241,32 @@ type ExecutorEvent =
  | { kind: "inbound_duplicate", providerId, eventId, originalProcessedAt, at }
  | { kind: "sse_replay_invariant_violated", taskId, expectedAfterEventId, actualEventId, at }
  | { kind: "skills_fallback_to_cache", skillName, cacheTimestamp, at }
+ | { kind: "team_started", taskId, teamId, parentExecutorId, rosterSize, initialWorkItemCount, at }
+ | { kind: "team_state_transition", taskId, teamId, from, to, reason, actor, at }
+ | { kind: "team_completed", taskId, teamId, outcome: "completed"|"failed"|"cancelled", summaryRef, at }
+ | { kind: "team_budget_near_limit", taskId, teamId, dim: "time"|"tokens"|"teammates"|"workItems"|"messages", usagePct, at }
+ | { kind: "team_budget_exhausted", taskId, teamId, dim: "time"|"tokens"|"teammates"|"workItems"|"messages", at }
+ | { kind: "team_message_budget_exhausted", taskId, teamId, at }
+ | { kind: "team_recovery_failed", taskId, teamId, reason: "forming_at_crash"|"no_survivors", at }
+ | { kind: "team_directory_archived", taskId, teamId, archivedPath, archivedAt, at }
+ | { kind: "teammate_spawned", taskId, teamId, teammateId, slotId, persona, at }
+ | { kind: "teammate_finished", taskId, teamId, teammateId, outcome: "finished"|"failed"|"cancelled", at }
+ | { kind: "teammate_critical_node_hit", taskId, teamId, teammateId, policyId, action, at }
+ | { kind: "teammate_critical_node_resolved", taskId, teamId, teammateId, policyId, decision: "resume"|"cancel", at }
+ | { kind: "teammate_paused", taskId, teamId, teammateId, reason, at }
+ | { kind: "teammate_resumed", taskId, teamId, teammateId, at }
+ | { kind: "teammate_recovery_failed", taskId, teamId, teammateId, reason: "crash_resume", at }
+ | { kind: "work_item_published", taskId, teamId, itemId, preferredRole, priority, at }
+ | { kind: "work_item_claimed", taskId, teamId, itemId, teammateId, fencingToken, at }
+ | { kind: "work_item_lease_expired", taskId, teamId, itemId, previousTeammateId, at }
+ | { kind: "work_item_reclaimed", taskId, teamId, itemId, previousTeammateId, attemptCount, at }
+ | { kind: "work_item_reclaim_exhausted", taskId, teamId, itemId, attemptCount, at }
+ | { kind: "work_item_completed", taskId, teamId, itemId, teammateId, resultRef, at }
+ | { kind: "work_item_failed", taskId, teamId, itemId, teammateId, failureClass, at }
+ | { kind: "work_item_cancelled", taskId, teamId, itemId, reason, at }
+ | { kind: "team_message_posted", taskId, teamId, messageId, fromRef, toRef, kind: "chat"|"handoff"|"directive"|"status"|"result_link", at }
+ | { kind: "team_claim_contention", taskId, teamId, teammateId, retriedCount, at }
+ | { kind: "tool_call_skipped", taskId, callId, reason: "preStateHashMismatch"|"non_idempotent"|"policy_block", at }
 ```
 
 注：`client_ack / sse_ack_missing / sse_replay_emitted / sse_replay_truncated` 4 个事件由 SSE handler 写入 `runtime.jsonl`（thread/task 维度的运行时观测），不写入 `tasks/<task-id>/events.jsonl`，避免污染 task 级事件流；客户端订阅 SSE 时仍会收到 `sse_replay_emitted` 与 `reload_required` 作为 custom 事件控制 UI 行为。
@@ -1087,8 +1371,38 @@ sequenceDiagram
 - 交互：`ask_clarification`、`confirm_task`、`confirm_plan`、`confirm_critical_node`。
 - 任务：`update_task`、`update_plan`。
 - subagent：`task`。
+- 团队：`team`（父 Executor 调，派生 Team）、`publish_work`、`claim_work`、`release_claim`、`complete_work`、`fail_work`、`post_message`、`read_messages`、`finish_team`。
 - 通知：`notify_bound_channel`（必须传 target）。
 - 检索：`tool_search`（可选）。
+
+### 11.4 Team 工具集合（详见 §24）
+
+| 工具 | 调用者 | 作用域 | `readOnly` | `destructive` | `concurrencySafe` | 默认 requiresApproval |
+|---|---|---|---|---|---|---|
+| `team` | 父 Executor | 任意 | ✗ | ✗ | ✗ | ✗（建议用户按需配 `require_approval`） |
+| `publish_work` | Lead / Teammate | team 内 | ✗ | ✗ | ✓ | ✗ |
+| `claim_work` | Teammate | team 内 | ✗ | ✗ | ✓ | ✗ |
+| `release_claim` | Teammate | team 内 | ✗ | ✗ | ✓ | ✗ |
+| `complete_work` | Teammate | team 内 | ✗ | ✗ | ✓ | ✗ |
+| `fail_work` | Teammate | team 内 | ✗ | ✗ | ✓ | ✗ |
+| `post_message` | Lead / Teammate | team 内 | ✗ | ✗ | ✓ | ✗ |
+| `read_messages` | Lead / Teammate | team 内 | ✓ | ✗ | ✓ | ✗ |
+| `finish_team` | Lead | team 内 | ✗ | ✓ | ✗ | ✗ |
+
+关键约束：
+
+- `team` 是 **non-idempotent**（§17.3），崩溃重放时必须按 in-flight 流程走 `blocked`；每次调用写 `tool_call.argsRef` 必须包含 roster 规范化哈希，新执行时比对避免误派第二个 team。
+- Team 内工具全部 `concurrencySafe=true`：同一 teammate 并发调 `claim_work` 会被目录 rename 原子化去冲突，不需要额外锁。
+- Teammate 不可调 `team`、不可调 `finish_team`（只有 lead 能）；Teammate 可调 `task` 工具派 subagent（一层），但不可派 team。
+- 所有写类团队工具写盘前经 §18.4 `sanitize()`。
+
+### 11.5 retry 不级联到 teammate
+
+§11.2.1 的规则外推到 Team：
+- Teammate 内部 transient_error 由 teammate 自身的 claim / reclaim 循环决定，不写父 task 的 `task_retry_scheduled`。
+- 父 task 收到 `team_completed{outcome: failed}` 时按本地策略决定父任务自身的 retry 路径；team 内部消耗的 reclaim 配额不计入父 task 配额。
+- WorkItem 的 reclaim（§24.4 claim 协议）走 team 自己的 `_message-seq` fencing，**不占用** `state/_locks/retry-scheduler.lock`；reclaim 不写 `task_retry_scheduled`。
+- §23.1 "retry × subagent 深度 ≥ 2 传播" 与 "Team 级 retry 调度器" 两项 v1 均不做；本节只说明 v1 路径上 teammate 浅层 reclaim 的边界，不放开多层级联。
 
 ---
 
@@ -1305,6 +1619,8 @@ Executor 在每次 tool dispatch 前调用 `evaluatePolicies(toolCall, context)`
 
 > retry 路径上的 policy 必须重审：retry 触发 `failed → queued` 派发新 ExecuteTaskJob 后，新 executor 在每次 tool call 前必须重新走 `Pol.evaluate(toolCall)`，不允许沿用上次失败前的 policy 决策（policy 配置可能在两次执行之间 hot-reload）。`risk_class=high` 的 skill 在 retry 路径上仍必须走 `awaiting_critical_node` 拦截，不缓存上次 approve 结果；这是 v1 retry 安全的最后一道闸。
 
+> Team 路径上 policy 必须按 teammate 独立评估：每个 teammate 在自己的每次 tool dispatch 前独立走 `Pol.evaluate(toolCall)`，不与其它 teammate 共享决策；同一 policy 对 teammate A approve 后，对 teammate B 必须重新评估，不得缓存审批结果。`scope: skill` policy 按 roster slot 的 `persona` 分流；v1 `argMatch` 只支持顶层字段字面量匹配（复杂 `$slot.persona` 占位表达式走 v2）。`kind: tool, toolName: "team", action: require_approval` 可以在 `team` 工具调用本身之前拦截，由父 task ownerUser 审批。详见 §24。
+
 ---
 
 ## 16. 客户端流式协议
@@ -1316,7 +1632,7 @@ Executor 在每次 tool dispatch 前调用 `evaluatePolicies(toolCall, context)`
 - **事件分类**：
  - `messages`：对话 token 流。
  - `values`：thread / task / plan 状态快照。
- - `custom`：业务事件（task_started / plan_revised / guard_decision / critical_node_hit / guard_degraded / task_blocked / task_block_resolved ...）。
+ - `custom`：业务事件（task_started / plan_revised / guard_decision / critical_node_hit / guard_degraded / task_blocked / task_block_resolved / team_* / teammate_* / work_item_* 见 §10.2 ExecutorEvent kinds 完整清单 ...）。
 - **`task_blocked` payload 客户端契约**：客户端收到 SSE `custom: task_blocked{taskId, blockedReason, suggestedActions}` 后必须按 `suggestedActions` 渲染按钮：`retry_exhausted` 仅启用 `cancel`；`retry_pending` 启用 `cancel` 并在 `nextRetryAt` 倒计时显示；`awaiting_user_action` 与 `non_idempotent_tool_in_flight` 启用三动作。用户点击后 client 走 `POST /api/tasks/{id}/retry`、`POST /api/tasks/{id}/skip`、`POST /api/tasks/{id}/cancel`；server 在写状态翻转前先 append `task_block_resolved` 事件。
 
 ### 16.1 客户端 ack 协议
@@ -1387,6 +1703,20 @@ Response 200:
 - 包含归档：当事件分布跨 active events.jsonl 与 `events-archive/<task-id>/*.jsonl.gz` 时，server 透明合并；客户端不感知归档。
 - 本 API 不暴露原始 LLM prompt / context（隐私保护，与 §18.4 LLM 不脱敏内存上下文不冲突）。
 
+### 16.5 Team 事件与 replay buffer
+
+Team 相关事件作为 **custom kind** 注入 §16 现有父 task SSE 流，**不新开通道**、不新开 buffer。完整事件清单见 §10.2 ExecutorEvent kinds（team_* / teammate_* / work_item_* 三组）。
+
+- **buffer 容量**：team 并发存在时单 thread 事件密度显著上升（messages + work_item_* + teammate_* 三类流），buffer 容量改由 `RUNTIME_SSE_REPLAY_BUFFER_EVENTS_WITH_TEAM`（默认 2000）控制；无 team 的 thread 仍用 `RUNTIME_SSE_REPLAY_BUFFER_EVENTS`（默认 1000）。
+- **ack 协议不变**：客户端仍每 `RUNTIME_SSE_ACK_INTERVAL_MS` 回写 cursor；team 事件与 task 事件共享 eventId 单调空间。
+- **replay invariant 扩展**：`sse_replay_invariant_violated` 检查派生事件必须后于源事件，新增以下对：
+ - `work_item_claimed` 必须后于同 itemId 的 `work_item_published`。
+ - `work_item_reclaimed` 必须后于同 itemId 的 `work_item_lease_expired`。
+ - `team_completed` 必须后于所有 teammate 的 `teammate_finished` 终态事件。
+ - `teammate_critical_node_resolved` 必须后于同 teammateId 的 `teammate_critical_node_hit`。
+- **归档关系**：teammate events.jsonl 与 team-events.jsonl 的归档（§17.6）对 SSE buffer 不可见；客户端查询归档走 `GET /api/tasks/{taskId}/teams/{teamId}/events?from=<archive-id>` 单独流式 gunzip。
+- **`team_message_posted` 仅携带指针**：SSE 事件不内联 message content（避免事件流爆炸），客户端按需 fetch `GET /api/tasks/{taskId}/teams/{teamId}/messages?cursor=`。
+
 ---
 
 ## 17. 故障恢复
@@ -1414,6 +1744,14 @@ on bot-runtime startup:
  - 写一条 `runtime.jsonl` 事件 `retry_scheduler_lock_reclaimed{previousHolder, previousFencingToken, leaseExpireAt, currentRuntimeId, at}`
  - 写一条 `retry_scheduler_lock_stolen{previousHolder, currentHolder=currentRuntimeId, fencingToken=newFencingToken}` 事件（与 §4.7.1 保持一致）
  - 不删除 stale 文件；运维通过 `cleanup_stale_locks` 周期任务清理过期 stale 文件（默认 30 天）
+ 7a. 扫 tasks/<task-id>/teams/<team-id>/，按 §9.5-§9.7 状态机恢复（详见 §24.10）：
+ - team.status ∈ {completed, failed, cancelled}：跳过（终态）
+ - team.status = forming：标 failed，写 `team_recovery_failed{reason:"forming_at_crash"}`，清场所有 teammate 目录；不尝试续跑
+ - team.status ∈ {active, finishing}：
+   - 扫 work-items/claimed/*.json：若 claimLeaseExpireAt 已过 → rename 回 available/，attemptCount++
+   - 扫 teammates/<teammate-id>/：若 status ∈ {spawning, working, paused, awaiting_critical_node} → 标 failed，写 `teammate_recovery_failed{reason:"crash_resume"}`；若 status=idle 保留
+   - 若所有 teammate failed & work-items/available 非空：team.status = failed，写 `team_recovery_failed{reason:"no_survivors"}`
+ - 不做自动 team 重建；父 Executor 恢复后看到 `team_recovery_failed` 事件，下一轮 LLM 决定是否重开 team
  8. 启动 ThreadLoop / Executor 池（按 role）+ 重试调度器 fiber（master 角色）
 ```
 
@@ -1531,6 +1869,18 @@ rotate(taskId, active_path, reason):
 
 重启扫描（§17.2 step）必须包含 `events-archive/<task-id>/*.jsonl.gz` 在内做 task 历史回放：按 archive-id 时间范围倒序扫描，但 SSE replay buffer（§16.2）只回放 active events.jsonl，不读 archive（buffer 是热缓存，archive 走 cold path / `GET /api/tasks/{id}/events?from=<archive-id>` 单独走流式 gunzip）。
 
+**Team 相关 jsonl 流复用同一归档算法**（64MB / 30 天，任一满足即归档）：
+
+| 流 | active 路径 | 归档位置 |
+|---|---|---|
+| team-events | `tasks/<taskId>/teams/<teamId>/team-events.jsonl` | `tasks/<taskId>/teams/<teamId>/_archive/team-events.<archive-id>.jsonl.gz` |
+| messages | `tasks/<taskId>/teams/<teamId>/messages.jsonl` | `tasks/<taskId>/teams/<teamId>/_archive/messages.<archive-id>.jsonl.gz` |
+| teammate events | `tasks/<taskId>/teams/<teamId>/teammates/<teammateId>/events.jsonl` | `.../teammates/<teammateId>/_archive/events.<archive-id>.jsonl.gz` |
+
+`events_jsonl_rotated` / `events_jsonl_rotation_failed` 事件新增字段 `teamId?` / `teammateId?` / `streamKind: "team-events" | "messages" | "teammate-events" | "task-events"`；metric `events_jsonl_rotated_total` / `events_jsonl_rotation_failed_total` 新增 label `streamKind`。
+
+Team 终态后：team.status 转吸收态的同时不立刻清目录；`RUNTIME_TEAM_DIRECTORY_ARCHIVE_DAYS`（默认 30）天后由独立清理 fiber 把整个 `teams/<team-id>/` 目录搬到 `_archive/teams/<team-id>/`（目录级 `.tar.gz`），写 `team_directory_archived{teamId, archivedPath, archivedAt}` 到父 task events.jsonl；客户端历史查询可按 team-id 走归档流。
+
 ### 17.4 双重确认幂等
 
 - confirmation 携带 nonce + 状态机检查；已 confirmed 状态忽略二次 confirm。
@@ -1579,6 +1929,19 @@ rotate(taskId, active_path, reason):
  - LLM 用于 retry 决策的内存上下文保留原文，避免分类质量下降。
  - regex 异常或字段长度 > 16KB 时截断到 16KB 并写 `lastFailureReason_redaction_failed`。
 - 与 `task_retry_classification_warning`的关系：classification 比较的是脱敏前的 `lastFailureReason`（在内存上下文里），不影响相似度判断。
+
+**Team 字段脱敏矩阵**（与 transcript 共享同一 `sanitize()` + 6 类正则）：
+
+| 字段 | 写入前是否脱敏 |
+|---|---|
+| `TeamMessage.content` | ✓ |
+| `WorkItem.description` | ✓ |
+| `WorkItem.resultRef` 指向的字符串内容 | ✓（字符串内容）；文件指针不脱敏 |
+| `team.summary.summaryText` / `teammate.summary` | ✓ |
+| Teammate events.jsonl 的 `tool_call.argsRef` / `tool_result.resultRef` 指向的文本 | ✓ |
+| teammate LLM 内存上下文 | **不脱敏**（LLM 需要原文工作） |
+
+命中时写 `lastFailureReason_redacted` 家族事件（复用现有事件 kind），新增 label `streamKind="team-events" | "messages" | "teammate-events"`，区别于任务级脱敏。
 
 ### 18.5 外发回环防护
 
@@ -1630,7 +1993,27 @@ rotate(taskId, active_path, reason):
  - `task_list_repair_total`（重启扫描修复 TaskList 与磁盘不一致的次数）。
  - `artifact_consistency_warning_total`（ArtifactRecord 与磁盘文件实体不一致计数，labeled by `kind=missing|extra|sha256_mismatch`）。
  - `skills_load_error_total`（按 `field` 维度标注失败原因）。
-- **审计文件**：`guard-decisions.jsonl` + `events.jsonl` + `task.json` 的版本历史 + `state/_diagnostics/skills.jsonl` + `change-records/<id>.json` 共同构成审计依据。
+ - Agent Teams（详见 §24，告警建议补入 §19.1 面板）：
+   - `team_started_total`（labeled by `parentTaskThreadId`）。每次 `team` 工具调用计 1。
+   - `team_completed_total`（labeled by `outcome=completed|failed|cancelled`）。team 终态。
+   - `team_forming_failed_total`（labeled by `reason=budget|spawn_timeout|policy_block|skill_load`）。forming 失败分类。
+   - `team_active_count`（gauge, labeled by `threadId`）。当前 active team 数。
+   - `teammate_spawned_total`（labeled by `persona`）。spawn 一次计 1。
+   - `teammate_failed_total`（labeled by `failureClass=transient_error|assertion_error|permission_error|cancelled`）。teammate 终态 failed。
+   - `teammate_active_count`（gauge, labeled by `teamStatus`）。按 team 状态聚合。
+   - `work_item_published_total`（labeled by `preferredRole`）。publish 次数。
+   - `work_item_claimed_total`。claim 成功次数。
+   - `work_item_completed_total`。完成次数。
+   - `work_item_failed_total`（labeled by `failureClass`）。
+   - `work_item_reclaim_exhausted_total`。重试耗尽。
+   - `work_item_available_count`（gauge, labeled by `threadId`，按 thread 聚合避免高基数）。当前待认领。
+   - `team_message_posted_total`（labeled by `kind`）。消息量。
+   - `team_message_budget_exhausted_total`。消息预算耗尽。
+   - `team_budget_exhausted_total`（labeled by `dim=time|tokens|teammates|workItems|messages`）。team 预算耗尽。
+   - `team_claim_contention_total`。claim race 命中次数，诊断 thrashing；告警：5min 均值 > 10/min。
+   - `team_recovery_failed_total`（labeled by `reason=forming_at_crash|no_survivors`）。崩溃恢复时的终结。
+   - `teammate_recovery_failed_total`（labeled by `reason=crash_resume`）。崩溃恢复。
+- **审计文件**：`guard-decisions.jsonl` + `events.jsonl` + `task.json` 的版本历史 + `state/_diagnostics/skills.jsonl` + `change-records/<id>.json` + `teams/<team-id>/team-events.jsonl` + `teams/<team-id>/messages.jsonl` + `teams/<team-id>/teammates/<teammate-id>/events.jsonl` 共同构成审计依据。
 
 ### 19.1 Grafana retry 仪表盘
 
@@ -1802,6 +2185,7 @@ CI 阶段加入"runbook 可执行性测试"：每条 SOP 注入对应 metric 异
 2. **TaskConfirmation eval**：模拟 50 条候选 task draft，验证 owner 用户的"确认 / 拒绝 / 修改"信号驱动状态机；owner 与非 owner 的"确认信号"分别 ≥ 95% 与 0% 进入正式确认门禁。
 3. **PlanRevision eval**：模拟 30 个变更场景（小修、大改、推倒重来），断言每条变更产生 `ChangeRecord`、新 `PlanRevision`，且旧 ArtifactRecord 的 `status` 全部转 `archived`、对应 `archivedArtifactPaths` 与磁盘 `_archive/<rev>/` 一一对齐。
 4. **FailureClassClassification eval**：固定 200 条 retry 失败样本（4 类 × 50：transient_error 50 / assertion_error 50 / permission_error 50 / user_cancelled 50），样本字段为 `{lastFailureReason: string, expectedFailureClass: 4 选 1}`；运行 LLM 自动分类，断言 (a) overall 准确率 ≥ 90%；(b) per-class precision / recall ≥ 0.85；(c) micro-F1 ≥ 0.85；低于阈值阻塞发布、把误分类样本追加到 prompt few-shot 后重跑；结果落 `tests/evals/results/<date>/failure-class.json`。每月轮换 50 条样本（保留 75% 旧 + 25% 生产新增样本），保证测试集不被 prompt 过拟合。
+5. **TeamOrchestration eval**：150 条样本 × 3 类 × 50（`orchestration="direct"` 50 / `orchestration="subagent"` 50 / `orchestration="team"` 50），断言 (a) 三分类一致率 ≥ 80%；(b) team 二分类召回 ≥ 0.85（不要漏判该用 team 的场景）；(c) team 二分类精确 ≥ 0.75（避免为小任务滥派 team）；(d) 角色分配 micro-F1 ≥ 0.7（LLM 推断 roster 与标注相似度）。低于阈值阻塞发布；结果落 `tests/evals/results/<date>/team-orchestration.json`。每月轮换 25% 样本（同 FailureClassClassification 策略）。
 
 eval 用 deer-flow 的 evals 模式参考；结果落 `tests/evals/results/<date>/`，每次运行写入 `summary.json`（pass / fail / metrics），失败时上抛 CI。
 
@@ -1842,6 +2226,17 @@ eval 用 deer-flow 的 evals 模式参考；结果落 `tests/evals/results/<date
 | notify 全局限频 | `RUNTIME_NOTIFY_GLOBAL_RPM=30`：(instance, provider, target) 维度的全局 requests-per-minute 上限；超过即写 `notify_throttled{reason: "global_rate_limit"}` |
 | events.jsonl 容量 | `RUNTIME_EVENTS_JSONL_MAX_BYTES=67108864`（64MB）：单 task active events.jsonl 字节上限；触发后归档到 `events-archive/<task-id>/<archive-id>.jsonl.gz` |
 | events.jsonl 老化 | `RUNTIME_EVENTS_JSONL_MAX_AGE_DAYS=30`：单 task active 文件 startTimestamp 距 now > 30 天即归档；与容量阈值任一满足 |
+| 单 task 并存 team | `RUNTIME_TASK_MAX_CONCURRENT_TEAMS=1`：v1 每个父 task 至多一个并存 team |
+| 单 team 最多 teammate | `RUNTIME_TEAM_MAX_TEAMMATES=4`：roster 默认上限 |
+| 单 team 硬上限 teammate | `RUNTIME_TEAM_HARD_MAX_TEAMMATES=8`：`team` 工具调用传 roster 超此硬上限即拒绝 |
+| 单 team 最多 work item | `RUNTIME_TEAM_MAX_WORK_ITEMS=32`：含初始 + publish_work 追加 |
+| 单 team 最多 message | `RUNTIME_TEAM_MAX_MESSAGES=200`：达 90% 写 `team_budget_near_limit`，达 100% 拒绝 post_message |
+| work item claim lease | `RUNTIME_TEAM_CLAIM_LEASE_MS=60000`：teammate 30s 心跳续约，60s 失效 |
+| work item claim 心跳 | `RUNTIME_TEAM_CLAIM_HEARTBEAT_MS=30000`：teammate 续约间隔 |
+| work item maxReclaims | `RUNTIME_TEAM_WORK_ITEM_MAX_RECLAIMS=2`：超过即落 `failed/`，失败原因 `transient_error` |
+| reclaim_scanner 轮询 | `RUNTIME_TEAM_RECLAIM_SCAN_MS=10000`：team 级 reclaim fiber 扫描间隔 |
+| SSE replay buffer（含 team） | `RUNTIME_SSE_REPLAY_BUFFER_EVENTS_WITH_TEAM=2000`：team 并发存在时替换默认 1000 |
+| team 目录归档延迟 | `RUNTIME_TEAM_DIRECTORY_ARCHIVE_DAYS=30`：team 终态后多少天把整个 team 目录 `.tar.gz` 归档 |
 
 ---
 
@@ -1868,6 +2263,7 @@ eval 用 deer-flow 的 evals 模式参考；结果落 `tests/evals/results/<date
 | Middleware Pipeline | DeerFlow | 引入 MessageGuardMiddleware / TaskConfirmationMiddleware / PlanRevisionMiddleware / CriticalNodePolicyMiddleware |
 | 消息守卫 | 本项目新增 | 规则短路 + LLM 结构化 |
 | TaskList / PlanRevision / CriticalNodePolicy | 本项目新增 | 不能用 TodoList 替代 |
+| Agent Teams（Team / Teammate / WorkItem / MessageBus） | 本项目新增（受 Anthropic Agent Teams 启发） | 详见 §24；与现有 Subagent 共存而非替代 |
 
 ---
 
@@ -1894,6 +2290,18 @@ eval 用 deer-flow 的 evals 模式参考；结果落 `tests/evals/results/<date
 - 故障恢复：lock + fencing token + 重启扫描 jobs/locked。
 - Secret / PII 脱敏。
 - 三条关键路径 agent eval。
+- Agent Teams 能力（详见 §24）：
+ - Team / TeamRosterSlot / TeamWorkItem / TeamMessage / Teammate 数据模型（§7.12-§7.16）。
+ - 9 个工具：`team` + `publish_work` / `claim_work` / `release_claim` / `complete_work` / `fail_work` / `post_message` / `read_messages` / `finish_team`（§11.3 - §11.5）。
+ - 三条状态机（§9.5 Team / §9.6 Teammate / §9.7 WorkItem）+ 与父 Task 的耦合规则（§9.8）。
+ - claim 原子协议 + reclaim_scanner + lease（§24.4）。
+ - CriticalNodePolicy 每个 teammate 独立评估（§15 注脚）。
+ - events.jsonl 三新流归档（§17.6）。
+ - SSE custom events + replay invariant 扩展（§16.5）。
+ - PII 脱敏全字段覆盖（§18.4 团队矩阵）。
+ - 新 metrics + 告警（§19 Agent Teams 组）。
+ - Team 面板 + 9 个新 HTTP 端点 + owner 校验（§24.8）。
+ - TeamOrchestration eval（§20.3 第 5 条）。
 
 第一版暂缓：
 
@@ -1914,6 +2322,17 @@ eval 用 deer-flow 的 evals 模式参考；结果落 `tests/evals/results/<date
  - retry 跨 subagent 深度 ≥ 2 传播。
  - retry storm 自动节流 / circuit breaker（后续假设，不在 v1 引入）。
  - per-tenant retry 配额、retry 任务数据库审计、retry 跨 thread 共享 quota。
+- Agent Teams 扩展项 — 任何一项都需开新 RFC，不在 v1：
+ - 跨 task / 跨 thread 的持久 team。
+ - Team 内再派 team（nested teams）。
+ - Teammate 之间的直接 tool 互调 / RPC。
+ - Team 级 retry 调度器。
+ - 运行中动态扩缩容 roster（增减 teammate）。
+ - Team 模板 / saved team configurations。
+ - Teammate 跨 team 自由流动。
+ - 多机 worker 分布式 team。
+ - `team` 工具图形化 roster 配置面板。
+ - LLM-as-reviewer 自动互评。
 
 v1 的 retry 约束清单（白名单视图）— 仅以下行为允许出现在 v1：
 
@@ -1928,6 +2347,23 @@ v1 的 retry 约束清单（白名单视图）— 仅以下行为允许出现在
 9. 与之相关的 §19 metric 与 §10.1 验收。
 
 任何超出该清单的 retry 行为都属于 v2 / 后续 RFC。
+
+v1 的 team 约束清单（白名单视图）— 仅以下行为允许出现在 v1：
+
+1. 单 parent task 至多 1 个并存 team（`RUNTIME_TASK_MAX_CONCURRENT_TEAMS=1`）。
+2. Team 寄生在父 task 内，不产生新 Task / 新 ThreadLoop。
+3. Roster 在 `team` 工具调用时固定，运行中不加 / 不减。
+4. TeamLead = 派生时父 Executor 本人，不新起 actor。
+5. 三种场景（并行分资 / 角色分工 / 分支探索）通过同一 `team` 工具 + roster 配置覆盖。
+6. WorkItem reclaim 独立于 retry-scheduler，attemptCount ≤ `maxReclaims` 默认 2。
+7. Team 无自动重试；team 失败由父 Executor 的 LLM 下一轮决策。
+8. Teammate 可派 subagent（一层），不可派 team，不可调 `finish_team`。
+9. Teammate 之间不允许直接 tool 互调，只能通过 work item claim + 消息总线协同。
+10. CriticalNodePolicy 每 teammate 独立评估；skill scope 按 persona 分流。
+11. 父 task cancel / pause / plan_update 必须先级联 cancel team 并等终态。
+12. 与之相关的 §19 metric（Agent Teams 组）与 §10.1 验收 57-69。
+
+任何超出该清单的 team 行为都属于 v2 / 后续 RFC。
 
 ### 23.2 主要风险
 
@@ -2133,6 +2569,288 @@ bash / skill / MCP 默认全开 + 关键节点空清单意味着 v1 高度信任
 - 关键 production 数据库 / API 通过 CriticalNodePolicy `kind: external_io` 拦截。
 - 模型 token 与执行时长走 `budget_overflow` 兜底。
 
+#### 23.2.9 Team claim thrashing
+
+LLM 把 work item 切得过细会让 claim 竞争压过实际计算：单个 item 的 LLM 推理耗时可能只有几百 ms，而 claim rename + lease 续约本身就占用可观时间。当 roster 远大于 work item 粒度的自然并行度时，多数 teammate 反复 `claim → race → retry → sleep` 空转。
+
+兜底：`team_claim_contention_total` 5 min 均值 > 10/min 触发告警，运维查 `team-events.jsonl` 的 `work_item_claimed` 与 `team_claim_contention` 密度比；长期高位需要在 prompt 层面提示 LLM 把 work item 粒度调大或减少 roster。
+
+#### 23.2.10 LLM 滥用 team 替代 subagent
+
+在简单任务上，LLM 被 `team` 工具的能力吸引，不必要地组建 roster，放大 token 消耗（每个 teammate 有自己的 LLM loop）。subagent 本该足够的场景被 team 覆盖会让单 task 成本翻数倍。
+
+兜底：TeamOrchestration eval（§20.3 第 5 条）的 team 二分类精确率阈值 ≥ 0.75 是发布硬门槛；生产环境 `team_forming_failed_total{reason="budget"}` > 0 即提示 prompt 有滥用倾向。
+
+#### 23.2.11 Teammate 间协作数据漂移
+
+消息总线本质异步：teammate A 发 `status` 消息报告已完成 item X 时，teammate B 可能基于"X 未完成"的旧 state 继续工作。v1 不提供跨 teammate 的强一致快照；协同靠 `kind=result_link` 消息 + work item resultRef 指针减少漂移，但不消除。
+
+兜底：关键协同场景应把依赖关系显式建模为 work item `preferredRole` 与 publish_work 的先后顺序（B 的 work item 只有在 A 完成后才由 lead publish），而不是依赖 teammate 自主读消息协调。这是 v1 的设计选择，不是缺陷。
+
+#### 23.2.12 Team 崩溃恢复放大
+
+一个 team 崩溃时 roster × work_item × message 三流都要清场：N 个 teammate 的 events.jsonl 需要判定 status、M 个 claimed work item 需要 rename 回 available、未 ack 的 SSE 事件可能堆积。恢复路径比 subagent 长几十倍。
+
+兜底：`team_recovery_failed_total` 计数 > 0 即 page；提供 `GET /api/tasks/{taskId}/teams/{teamId}/recovery-log` 聚合排查接口；生产环境建议 `RUNTIME_TEAM_MAX_TEAMMATES` 保守设 4 以下，配合 kill -9 e2e 剧本覆盖恢复路径。
+
+---
+
+## 24. Agent Teams
+
+### 24.1 定位与场景
+
+Team 是**比 Subagent 更重的协作原语**，由父 Executor 通过 `team` 工具派生。与 Subagent 共存（§11.2.1 retry 合同对齐）而不是替代：
+
+- 单线隔离上下文 → 用 Subagent（`task`）。
+- 需要共享任务池 + teammate 间直接通信 → 用 Team（`team`）。
+
+三类典型场景（通过同一 `team` 工具 + roster 配置覆盖）：
+
+1. **并行分资**：一个任务拆成 N 个同质子任务，多个同质 teammate 并行处理。
+2. **角色分工**：researcher / coder / reviewer 等异质 teammate 协作推进一个 task。
+3. **分支探索**：多个 teammate 并行尝试不同思路，lead 选优合成。
+
+### 24.2 组件层级
+
+```
+ThreadLoop (per thread)
+    └─ Executor (per task, 父 task)          ← 同时兼 TeamLead
+          ├─ task tool → Subagent            (保留，树状，单向回报)
+          │
+          └─ team tool → Team (per parent task, v1 至多 1 个并存)
+                ├─ SharedTeamTaskList         (team 内部, work item 池)
+                ├─ TeamMessageBus             (messages.jsonl, append-only 广播)
+                ├─ TeamRoster                 (每个 slot 的 persona / skill / budget)
+                ├─ Teammate 1 actor           (独立 LLM loop + events)
+                ├─ Teammate 2 actor
+                └─ Teammate N actor
+```
+
+关键不变量：
+
+- TeamLead = 发起的父 Executor 本人，不新起 actor，只是多了"协调 team"的职责。
+- Teammate = 子 Executor 级别的 actor，独立 LLM loop + 独立 events，共享 team 内部任务池与消息总线。
+- Team 寄生在父 Task 内部，不创建新 Task 记录，不走确认门禁；父 task 确认一次即可。
+- WorkItem ≠ Task：只有 `available / claimed / completed / failed / cancelled` 五态，没有 plan / budget / owner 包袱。
+
+### 24.3 `team` 工具签名
+
+```ts
+type TeamToolInput = {
+ teamName: string                        // 人类可读,审计用
+ roster: Array<{
+   slotName: string
+   persona?: string
+   skillAllowlist?: string[]
+   preferredRoles?: string[]
+   maxConcurrentClaims?: number          // 默认 1
+ }>
+ initialWorkItems: Array<{
+   description: string
+   preferredRole?: string
+   priority?: number                     // 默认 0
+ }>
+ budget?: Partial<TeamBudget>            // 未传字段按 §21 默认
+ idempotencyKey?: string                 // 重试父 task 时避免重复建 team
+}
+
+type TeamToolOutput = {
+ teamId: string
+ status: "forming" | "active"
+ spawnedTeammates: Array<{ teammateId: string; slotId: string }>
+ acceptedWorkItemIds: string[]
+ rejectedWorkItems: Array<{ index: number; reason: string }>
+}
+```
+
+行为合同：
+
+1. Executor 调用进入后，server 先做 schema 校验 + budget 校验（team.budget ≤ 父 task 剩余）+ CriticalNodePolicy 评估。
+2. 幂等键：`idempotencyKey = sha256(父 taskId + roster 规范化 + initialWorkItems 规范化)`；若父 task 同键已有 team 就直接返回现有 teamId（§17.3 非幂等崩溃恢复路径）。
+3. 异步创建 team.json → 写 `team_started` → 逐个 spawn teammate actor（每 spawn 一个写一条 `teammate_spawned{teammateId, slotId}`）→ 把 initialWorkItems 写入 `work-items/available/`。
+4. 所有 teammate `status=idle` 时 `team.status` 从 `forming` 翻 `active`，返回。
+5. 父 Executor 此后进入 lead 监听循环（§24.6）；不阻塞等待 team 完成，可以并行推进父 task 的其它 plan step。
+
+### 24.4 Claim 协议（原子性）
+
+`claim_work{preferredRole?}` 的 server 端处理：
+
+```text
+loop 最多 3 次:
+  扫 work-items/available/*.json
+  候选 = 过滤 preferredRole 命中 OR item.preferredRole 缺失
+  排序 = (priority desc, createdAt asc)
+  若候选为空:
+    return { claimed: null, reason: "no_work_available" }
+  取首个候选 item:
+    new_fencing = bump_team_seq(teamId)         # 来源:team 目录 _message-seq
+    临时写 claimed/<item-id>.json 含 claimedBy / leaseExpire / fencing
+    尝试 rename available/<item-id>.json → claimed/<item-id>.json (O_EXCL)
+    if rename 成功:
+      append team-events.jsonl: work_item_claimed{itemId, teammateId, fencing}
+      return { claimed: item-with-fencing }
+    else (被别的 teammate 抢了):
+      丢弃临时 claimed 文件
+      append team-events.jsonl: team_claim_contention{teammateId, itemId}
+      continue
+return { claimed: null, reason: "contention_exhausted" }
+```
+
+**Lease 续约**：teammate 每 `RUNTIME_TEAM_CLAIM_HEARTBEAT_MS`（默认 30s）写一次 `claimed/<item-id>.json` 的 `claimLeaseExpireAt`；失败即视为心跳丢失。
+
+**reclaim_scanner fiber**（team 级，由 lead 持有）：
+- 每 `RUNTIME_TEAM_RECLAIM_SCAN_MS`（默认 10s）扫 `claimed/*.json`；
+- 发现 `claimLeaseExpireAt < now` → rename 回 `available/`，`attemptCount += 1`，写 `work_item_reclaimed`；
+- `attemptCount >= maxReclaims`（默认 2）→ rename 到 `failed/`，`failureClass = transient_error`，写 `work_item_reclaim_exhausted`。
+
+### 24.5 Teammate agent loop
+
+与 §11.1 Executor loop 同构，差异点：
+
+```
+loop until teammate terminal:
+  if currentWorkItemId is null:
+    read_messages() until 新消息消费完
+    claim_work()
+    if claimed is null:
+      若 team.status ∈ {finishing, completed, cancelled} → 退出 loop
+      否则 sleep 2s 再试（指数退避,最多 30s）
+      continue
+    currentWorkItemId = claimed.id
+    续约 fiber 启动
+  执行 LLM 推理 + tool 调用(可用工具 = 父 task tool set ∩ skillAllowlist ∪ team 内工具)
+  CriticalNodePolicy 每次 tool dispatch 前评估（skill 维度可按 slot.persona 精细化）
+  当推理认为 work item 完成 → complete_work(resultRef) 或 fail_work(failureClass, reason)
+  续约 fiber 停止
+  currentWorkItemId = null
+```
+
+关键约束：
+
+- Teammate 不可调 `team`、不可调 `finish_team`（只有 lead 能）。
+- Teammate 可调 `task` 工具派 subagent（一层，与父 Executor 对等），但不可再派 team。
+- Teammate 之间**没有直接调用对方工具的通道**，所有协同走 `post_message` / `claim_work` / `complete_work` 的产物引用。
+
+### 24.6 消息总线与 Lead 监听循环
+
+`post_message{to, kind, content, referencedWorkItemIds?}`：
+- server 端 bump `_message-seq` → 写 `messages.jsonl` → 写 `team-events.jsonl: team_message_posted{messageId}`。
+- `to=broadcast`：所有 teammate + lead 可见。
+- `to=lead`：仅 lead `read_messages` 可见（其它 teammate 过滤掉）。
+- `to={teammateId}`：仅该 teammate + lead 可见（lead 始终有全读权限）。
+
+`read_messages{cursor?, limit?}`：从 `cursor + 1` 开始返回，按 `to` 过滤出调用者可见消息；默认 `limit=50`，硬上限 100；返回的最大 messageId 写回 teammate.json 的 `lastMessageCursor`。
+
+**背压**：
+- 接近 `team.budget.maxMessages` 90% → `post_message` 返回 `warn_budget_near_limit`，LLM 决定是否继续。
+- 达 100% → `post_message` 失败返回 `budget_exceeded`，写 `team_message_budget_exhausted`。
+
+**Lead 监听循环（父 Executor 内）**：
+
+```
+父 Executor 主 loop 里每次 LLM 轮询前:
+  if 有 active team:
+    read_messages(team, cursor=lastLeadCursor) → 注入本轮 prompt
+    若收到 handoff/directive kind 的消息 → LLM 决定是否 publish_work / post_message 回应
+    检查 team.status:
+      completed → 把 team.summary 注入 prompt,当作"子任务完成报告"
+      failed → 把 team.summary + 失败分类注入,LLM 决定父 task 是 retry 还是 fail
+      cancelled → 注入 cancel 原因
+  继续父 task 自己的推理
+```
+
+父 Executor **不强制等待 team 结束**；当 `team.status` 终态时下一轮 prompt 会自动收到 team 摘要作为"事件"。
+
+### 24.7 `finish_team` 与 `critical_node_hit`
+
+`finish_team` 工具：
+
+```ts
+type FinishTeamInput = {
+ teamId: string
+ reason: "objective_met" | "budget_exceeded" | "abort"
+ aggregateSummary?: string               // lead 合成,注入父 task 上下文,经脱敏
+ harvestOutputs?: boolean                // true 时把 teammates 的 outputs 链接到父 task outputs
+}
+```
+
+行为：
+1. `team.status` 从 `active` 翻 `finishing`。
+2. 写 `control.json signal=cancel` 到所有 teammate 目录（§10.3 graceful 合同）。
+3. Teammate 收到 `cancel` 后完成当前 in-flight tool call → 写 `executor_finished{outcome=cancelled}` → 退出。
+4. 所有 teammate 终态后 team.status → `completed` / `failed` / `cancelled`。
+5. 写 `team_completed{teamId, outcome, summaryRef}` 到父 task events.jsonl。
+
+**Teammate 的 tool call 命中 `require_approval` 时**：
+- teammate 写 `critical_node_hit` 到**自己的** events.jsonl；
+- 同时写 `teammate_critical_node_hit{teammateId, policyId}` 到 **team-events.jsonl**（汇聚给 lead 与客户端）；
+- teammate status → `awaiting_critical_node`，等 `control.json signal=resume / cancel`（lead 或用户通过 SSE 审批端点下发）；
+- **其它 teammate 不受影响**，可继续 claim 别的 work item。
+
+### 24.8 客户端契约与 HTTP 端点
+
+**Team 面板（新增，嵌在父 task 视图内）**：
+- Roster 网格：每个 slot 显示 persona、当前 teammate 状态、正在处理的 work item。
+- Shared work item 列表：available / claimed / done / failed 四段式。
+- Messages feed：按消息总线时序展示，按 `from / to / kind` 过滤。
+- Per-teammate events drawer：点击 teammate 进入查看其独立 events 流（用现有 runtime events 视图组件）。
+
+**审批 UI**：
+- `teammate_critical_node_hit` 收到后在 team 面板对应 teammate 行显示 approve / reject 按钮。
+- 仅父 task 的 owner user 可点（继承父 task ownerUserId，团队不单独设 owner）。
+- 两阶段校验沿用验收 42：owner → status → 写 `task_action_denied` 事件（扩展 requestedAction 支持 `"team_cancel" / "teammate_approve" / "teammate_reject"`）。
+
+**新 HTTP 端点**：
+
+```
+GET  /api/tasks/{taskId}/teams                       # 当前 / 历史 team 列表
+GET  /api/tasks/{taskId}/teams/{teamId}              # team 详情（roster + budget + status）
+GET  /api/tasks/{taskId}/teams/{teamId}/work-items   # work item 列表,支持 status 过滤
+GET  /api/tasks/{taskId}/teams/{teamId}/messages     # 消息流,cursor 分页
+GET  /api/tasks/{taskId}/teams/{teamId}/teammates                    # teammate 列表
+GET  /api/tasks/{taskId}/teams/{teamId}/teammates/{id}/events        # teammate 事件流,cursor 分页
+GET  /api/tasks/{taskId}/teams/{teamId}/events?from=<archive-id>     # 历史归档事件流
+GET  /api/tasks/{taskId}/teams/{teamId}/recovery-log                 # 崩溃恢复诊断
+POST /api/tasks/{taskId}/teams/{teamId}/cancel                       # owner 强制终止
+POST /api/tasks/{taskId}/teams/{teamId}/teammates/{id}/approve       # 审批关键节点
+POST /api/tasks/{taskId}/teams/{teamId}/teammates/{id}/reject        # 拒绝关键节点
+```
+
+所有端点走 §16.4 retry-history view 相同的 owner + pagination + redaction 合同。
+
+### 24.9 测试与 Eval
+
+**单元 / 集成矩阵**（补入 §20.1）：
+- Schema 校验：Team / TeamRosterSlot / TeamWorkItem / TeamMessage / Teammate 全字段正 / 负 / 枚举越界样本。
+- 状态机：§9.5-§9.7 每条边至少一条测试。
+- Claim 原子性：5 teammate 并发 claim 同 item 恰好 1 成功；lease 过期后 reclaim + attemptCount++；attemptCount 达 maxReclaims 落 failed。
+- Budget 强制：team.budget 超父 task → `team_budget_exceeds_parent` 拒绝；运行中任一维度达上限 → `team_budget_exhausted` + team finishing。
+- 级联 cancel：父 task cancel → team cancel → teammate graceful；pause 保留 claim；plan_update 先 cancel team 再走 PlanRevision 事务（顺序验证）。
+- 崩溃恢复：§9.5-§9.7 + §17.2 step 7a 每条路径；in-flight `team` 工具的 idempotencyKey 幂等。
+- CriticalNodePolicy：teammate A approve 不影响 teammate B 的重新评估；persona scope 分流。
+- PII 脱敏：6 类正则命中每个 team 字段；LLM 内存路径不脱敏；`streamKind` label 正确。
+- SSE：共享 eventId 单调；`sse_replay_invariant_violated` 对 team 派生事件有效；buffer 溢出走 `reload_required`。
+- HTTP owner 校验：非 owner HTTP 403 + `task_action_denied`；终态 team HTTP 409。
+
+**E2E 剧本**（补入 §20.2）：
+1. happy path 同质团队：2-slot + 4 work item 全 completed。
+2. 角色分工：3-slot (researcher / coder / reviewer) 协作。
+3. Team budget 耗尽：team failed → 父 LLM 降级 subagent。
+4. Parent task cancel 级联。
+5. Plan update × active team：先 cancel team 再 PlanRevision 事务。
+6. kill -9 during active team：90s 内完成 reclaim + recovery。
+7. Claim thrashing 自诊：roster=2 + work items=50 + 极短 item，断言 contention 不超 50 × 1.5。
+
+**TeamOrchestration eval**（§20.3 第 5 条 agent eval）：150 条样本 × 3 类 × 50（直接 tool / subagent / team），一致率 ≥ 80%、team 召回 ≥ 0.85、team 精确 ≥ 0.75、role F1 ≥ 0.7。低于阈值阻塞发布，结果落 `tests/evals/results/<date>/team-orchestration.json`。
+
+### 24.10 崩溃恢复流程
+
+见 §17.2 step 7a。关键原则：
+- forming 期崩溃直接标 failed，不尝试续跑。
+- active / finishing 期崩溃按 claim lease 过期与 teammate status 分别清场。
+- 不做自动 team 重建；父 Executor 恢复后看到 `team_recovery_failed` 事件，下一轮 LLM 决定是否重开 team。
+- `team` 工具的 idempotencyKey 保证崩溃重放不派第二个 team。
+
 ---
 
 ## 附录 A — 命名一致性约定
@@ -2166,5 +2884,8 @@ bash / skill / MCP 默认全开 + 关键节点空清单意味着 v1 高度信任
 - **守卫降级**：规则短路 + 重点过 LLM；防群聊噪声 + 控成本；LLM 挂走纯规则。
 - **自治原则**：高自治 + 关键节点；bash / skill / MCP 全开。
 - **关键节点 v1**：空清单 + 扩展点（CriticalNodePolicy）；用户跑起来再加。
+- **Agent Teams 与 Subagent**：共存而非替代；LLM 通过 `team` 工具自主选择；Team 寄生于父 task 内部，不打破 active task 严格 1 合同；Team 无 retry，失败由父 Executor LLM 决策。
+- **Team 的 lead**：父 Executor 本人即 lead，不新起 actor；保持单写者语义、复用 ownerUser 与确认门禁。
+- **WorkItem vs Task**：WorkItem 是 team 内部轻量单元（5 态、无 budget / owner），与 Task（重量级，含 plan / retry / 确认门禁）清晰分离。
 
 ---
