@@ -14,3 +14,15 @@
 
 # Local references
 reference/
+
+# Node / pnpm
+node_modules/
+.pnpm-store/
+*.tsbuildinfo
+dist/
+.next/
+data/
+coverage/
+.env
+.env.local
+.env.*.local

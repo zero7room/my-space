@@ -1,0 +1,4 @@
+# Local Docker compose for development. Currently a no-op placeholder for v1 hybrid
+# (single bot-runtime process, single web). Filled in during Phase 11 (Ops).
+version: "3.9"
+services: {}
