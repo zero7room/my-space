@@ -1,10 +1,12 @@
 # AI 自动工作流系统架构设计
 
-版本：final-v001 独立整理版
+版本：final-v001 一次性交付版
 日期：2026-04-30
 状态：最终整理
 
 本文档为独立交付版，除配套 `requirement.md` 外不依赖仓库中的其它文件。
+
+> 范围声明：本文档中的 v1 / 第一版指一次性交付的完整产品版本，包含 core、可靠性、观测、飞书集成、retry、SSE、Agent Teams 与评测能力。章节中的“推荐顺序”仅表示工程依赖与验收推进顺序，不表示拆版本或裁剪功能。
 
 ---
 
@@ -48,7 +50,7 @@
 - **AI 员工高自治 + 关键节点拦截**：任务确认后自主推进；只在用户配置的关键节点回到人工。
 - **TaskList 唯一权威**：不维护独立 TaskQueue 数据，调度从 List 投影队列视图。
 - **进程内分层**：ThreadLoop（thread 主循环，常驻轻量）+ Executor（task 执行循环，短命）；用户可在执行中随时插话。
-- **bot-runtime 通用化**：单一二进制 + 配置化角色（master / worker / hybrid），单机 v1 hybrid 一键起，多机 v2 通过共享存储或 RPC 协调。
+- **bot-runtime 通用化**：单一二进制 + 配置化角色（master / worker / hybrid），本次一次性交付以单机 hybrid 一键起为默认运行形态，多机通过共享存储或 RPC 协调留作后续扩展。
 - **文件系统持久化优先**：所有关键状态（task、plan、绑定、job、policy）都落盘，进程崩溃可恢复。
 - **通用 Channel + 可插拔 Provider**：飞书是第一种 provider，runtime 不直接依赖 Feishu SDK。
 
@@ -238,7 +240,7 @@ flowchart LR
 ThreadLoop 是 thread 维度的 actor，常驻轻量：
 
 - 接收 inbound 事件、客户端事件、Executor 上报事件。
-- 维护 thread 状态（chatting / planning / waiting_confirmation / working / blocked / awaiting_critical_node / idle）。
+- 维护 thread 状态（chatting / planning / waiting_confirmation / working / blocked / paused / awaiting_critical_node / idle）。
 - 对话与澄清。
 - 草稿 task / plan 生成与确认门禁。
 - 写 `control.json` 控制 Executor。
@@ -265,7 +267,7 @@ Executor 是 task 维度的对象（per task），短命：
 - 管理 runtime 注册和心跳（v1 单机本身就是 runtime）。
 - 从 TaskList 投影"可执行队列视图"，按 thread 维度依次取下一个 confirmed/queued task。
 - 派发 `execute_task` job 到 `jobs/pending/`。
-- 重试调度器：固定周期扫描 `status=failed` 任务，根据 `task.retry.nextRetryAt` 决定 requeue。
+- 重试调度器：固定周期扫描 `status=failed` 任务，根据 `task.retry.nextRetryAt` 决定 requeue。它属于本次一次性交付范围，但工程上依赖 Task / Plan / Executor / events.jsonl 基础闭环先完成。
 - 处理暂停、取消信号。
 - 收集 runtime / executor 状态，同步给 Gateway。
 
@@ -464,6 +466,17 @@ type SkillManifest = {
 }
 ```
 
+`SKILL.md` frontmatter 使用 snake_case，运行时模型使用 camelCase。解析层负责唯一映射：
+
+| frontmatter 字段 | 运行时字段 |
+|---|---|
+| `when_to_use` | `whenToUse` |
+| `allowed_tools` | `allowedTools` |
+| `output_contract` | `outputContract` |
+| `risk_class` | `riskClass` |
+
+schema 校验错误里的 `field` 使用 frontmatter 原始字段名，避免用户按错误提示修改 `SKILL.md` 时看到运行时内部命名。
+
 校验失败处理：runtime 启动时对每个 `skills/**/SKILL.md` 解析 frontmatter，未通过 schema 校验的 skill 不进入注册表，并写入：
 
 ```ts
@@ -491,6 +504,7 @@ type Thread = {
  | "waiting_confirmation"
  | "working"
  | "blocked"
+ | "paused"
  | "awaiting_critical_node"
  | "idle"
  taskListId: string
@@ -521,6 +535,7 @@ type Task = {
  | "running"
  | "awaiting_critical_node"
  | "blocked"
+ | "paused"
  | "changing"
  | "completed"
  | "failed"
@@ -537,8 +552,8 @@ type Task = {
  archivedRevisionIds: string[] // 历史 plan revision
  blockedReason?: BlockedReason // status ∈ {blocked, failed} 时必填
  schemaVersion: 1 | 2 // 2 表示包含 TaskRetryState；缺失或解析失败按 1 处理
- lastUserSignalAt?: string // ISO timestamp，cancel/pause/revise 信号写 control.json 时同步刷新
- lastUserSignalKind?: "cancel" | "pause" | "revise" // 最近一次用户信号的类型
+ lastUserSignalAt?: string // ISO timestamp，cancel/pause/resume/revise 信号写 control.json 时同步刷新
+ lastUserSignalKind?: "cancel" | "pause" | "resume" | "revise" // 最近一次用户信号的类型
  createdAt: string
  updatedAt: string
 }
@@ -564,6 +579,7 @@ type TaskRetryState = {
  | "assertion_error"
  | "permission_error"
  | "user_cancelled"
+ | "budget_overflow"
  lastFailureAt?: string
  lastFailureReason?: string // 短文本，长版进 events.jsonl
  nextRetryAt?: string // 下次允许 master 重新派发的时间；缺失视为不重试
@@ -644,6 +660,8 @@ type GuardDecision = {
  | "confirm_task"
  | "confirm_plan"
  | "progress_query"
+| "pause_task"
+| "resume_task"
  | "cancel_task"
  | "irrelevant"
  targetTaskId?: string
@@ -741,13 +759,20 @@ type CriticalNodePolicy = {
 
 type NodeMatcher =
  | { kind: "tool", toolName: string, argMatch?: Record<string, unknown> }
+ | { kind: "skill", riskClass?: "low" | "medium" | "high", skillName?: string }
  | { kind: "external_io", direction: "outbound", provider?: string }
  | { kind: "filesystem", op: "delete" | "overwrite", minCount?: number }
  | { kind: "budget_overflow", dim: "time" | "tokens" | "subagents" | "cost" }
  | { kind: "out_of_scope", planRevisionId: string }
 ```
 
-加载顺序：global → user → thread → skill，后者覆盖前者。注入点：Executor 在 tool dispatch 之前评估所有 policy。v1 默认值：空数组。
+加载顺序：built-in → global → user → thread → skill，但低层 scope 不得降级高层 / 内置策略。注入点：Executor 在 tool dispatch 之前评估所有 policy。v1 内置默认值只包含一条高风险 skill 审批基线：`{ matcher: { kind: "skill", riskClass: "high" }, action: "require_approval" }`；除该安全基线外，默认用户可配置清单为空。
+
+合并规则：
+
+- 多条 policy 命中同一 tool call 时，最终动作按严格度取最大值：`block > require_approval > log_only`。
+- `skill` / `thread` / `user` scope 可以增加约束或缩小匹配条件，但不能把 built-in / global 的 `block` 降为 `require_approval` 或 `log_only`，也不能把 `require_approval` 降为 `log_only`。
+- 若需要临时放宽策略，只能显式禁用或修改产生该约束的上层 policy，并留下 `critical_policy_changed` 审计事件。
 
 ### 7.11 RuntimeRegistration
 
@@ -842,7 +867,7 @@ type TeamWorkItem = {
 }
 ```
 
-落盘位置由 status 决定:`work-items/available/<id>.json` / `claimed/<id>.json` / `done/<id>.json` / `failed/<id>.json`,通过原子 rename 迁移（复用 §10.1 jobs 三态目录模型）。
+落盘位置由 status 决定:`work-items/available/<id>.json` / `claimed/<id>.json` / `completed/<id>.json` / `failed/<id>.json`,通过原子 rename 迁移（复用 §10.1 jobs 三态目录模型）。
 
 ### 7.15 TeamMessage
 
@@ -944,7 +969,7 @@ data/
  work-items/
  available/<item-id>.json # 待认领
  claimed/<item-id>.json # 已认领,含 claimedBy + leaseExpireAt + fencingToken
- done/<item-id>.json # 完成态
+completed/<item-id>.json # 完成态
  failed/<item-id>.json # 失败态
  _index.json # 扫描加速索引(可选)
  teammates/
@@ -968,6 +993,8 @@ data/
  channel-messages/<channel-type>/_idx
  critical-node-policies/
  <policy-id>.json
+_transactions/
+<tx-id>.json # 文件级事务日志，prepared/committed/rolled_back 恢复依据
  jobs/
  pending/<job-id>.json
  locked/<job-id>.json # 含 lockHolder, leaseExpireAt
@@ -990,6 +1017,7 @@ data/
 - task 级上下文与 thread 级上下文分目录（`tasks/<task-id>/context/` vs `threads/<thread-id>/context/`）。
 - 旧 artifact 归档在 `outputs/_archive/<revision-id>/`。
 - Team 子树寄生在父 task 目录（`tasks/<task-id>/teams/<team-id>/`），team 终态后 30 天由独立清理 fiber 搬到 `_archive/teams/<team-id>/`（目录级 `.tar.gz`）。
+- WorkItem 完成态目录统一为 `work-items/completed/`，与 `TeamWorkItem.status="completed"` 保持一致；`done/` 仅允许作为历史迁移输入，不作为新写入路径。
 
 ---
 
@@ -1006,13 +1034,20 @@ stateDiagram-v2
  confirmed --> cancelled: user cancel
  queued --> running: executor leases
  queued --> cancelled: user cancel
+queued --> paused: user pause
  running --> awaiting_critical_node: critical-node hit
  awaiting_critical_node --> running: user approve
  awaiting_critical_node --> cancelled: user reject
+awaiting_critical_node --> paused: user pause
  running --> blocked: ask_clarification or executor stalled
  blocked --> running: user reply
+blocked --> queued: user skip blocked step/tool
  blocked --> cancelled: user cancel
+blocked --> paused: user pause
  blocked --> failed: lease expired with no recovery
+paused --> queued: user resume
+paused --> cancelled: user cancel
+paused --> changing: user revise
  running --> changing: user revise
  changing --> queued: revision confirmed
  changing --> cancelled: user cancel during revision
@@ -1023,26 +1058,28 @@ stateDiagram-v2
 
 Task 状态机不变量：
 
-- 终止状态 `completed` / `failed` / `cancelled` 是吸收态；任何转移路径不得让任务从这三个状态中走出（除了 `failed → queued` 的有限重试，且重试由 master 而非用户触发）。
-- 取消信号可以从任何非终止状态进入 `cancelled`；但已 `completed` 的任务不能"撤销完成"。
+- 终止状态 `completed` / `cancelled` 是严格吸收态；`failed` 是可恢复失败态，只允许通过本文定义的三条恢复路径走出：master 自动 retry、用户显式 retry、已确认 plan_update 触发 retry reset。除此之外，任何从 `failed` 走出的转移都必须拒绝。
+- 取消信号只能从 `confirmed / queued / running / awaiting_critical_node / blocked / paused / changing` 进入 `cancelled`；已 `completed` 的任务不能"撤销完成"，已 `failed` 的任务也不得反转为 `cancelled`，只能记录用户 cancel 信号以抑制尚未执行的自动 retry。
+- `paused` 是用户主动暂停态，不是阻塞态也不是终态：`pause` 从 `queued / running / awaiting_critical_node / blocked` 进入 `paused`；Executor 完成当前 tool call 后写 `executor_paused` 并释放 job lease；`resume` 只允许 `paused → queued`，由 master 重新派发，不复用旧 executor lease。
+- `skip` 不是 Task 终态，只能用于 `blocked` 且 `blockedReason ∈ {awaiting_user_action, non_idempotent_tool_in_flight}`：server 把当前 active PlanStep 标记为 `skipped`，写 `task_block_resolved{action:"skip"}`，再把 task 置回 `queued`。若无法定位当前 step 或当前 blockedReason 不支持 skip，必须拒绝并写 `task_action_denied{reason:"invalid_state"}`。
 - 状态转移日志按 `task_state_transition` 事件写入 events.jsonl，字段 `from / to / reason / actor / at`。
 
 本设计把 `failed → queued` 重试合同从 `TaskBudget` 字段挪到独立的 `TaskRetryState` 中，并在状态机层约束：
 
-- `failed → queued` 仅由 master 调度器触发，前置条件全部满足时才执行：
+- `failed → queued` 自动重试仅由 master 调度器触发，前置条件全部满足时才执行：
  - `task.retry.failureClass = "transient_error"`，且
  - `task.retry.attemptCount < task.retry.maxRetries`（默认 maxRetries=2），且
  - `now >= task.retry.nextRetryAt`。
 - 触发时 master 在写状态转移之前先写 `task_retry_scheduled` 事件并把 `attemptCount += 1`，再把任务重新放回 TaskList 投影队列。
-- 失败属于 `assertion_error / permission_error / user_cancelled` 时不写 `task_retry_scheduled`，状态停留在 `failed`，并写一条 `task_retry_exhausted{reason: "non_transient"}`。
+- 失败属于 `assertion_error / permission_error / user_cancelled / budget_overflow` 时不写 `task_retry_scheduled`，状态停留在 `failed`，并写一条 `task_retry_exhausted{reason: "non_transient"}`。
 - `attemptCount >= maxRetries` 的 transient 失败也走 `task_retry_exhausted{reason: "max_retries"}`，不再继续 requeue。
-- 任何来自 `failed` 但目标不是 `queued` 的转移请求（例如试图直接回到 `running` 或写到 `completed`）必须被拒绝，写 `task_state_transition_blocked{from: "failed", to: <attempted>}`。
+- 任何来自 `failed` 但目标不是 `queued` 的转移请求（例如试图直接回到 `running` 或写到 `completed`）必须被拒绝，写 `task_state_transition_blocked{from: "failed", to: <attempted>}`。`failed → queued` 也只能由自动 retry、用户显式 retry、plan_update retry reset 三条受控路径触发。
 - 用户显式重试（客户端 / `/retry` 命令）走单独通道：把 `retry.attemptCount` 重置为 0、清空 `failureClass / nextRetryAt`，写 `task_manual_retry_requested` 事件后再走 `failed → queued`，与自动重试不混用 retry 配额。
 - cancel × retry 竞态：master 在 `failed → queued` 转移前必须比较 `task.lastUserSignalAt` 与 `task.retry.lastFailureAt`：
- 1. 如果 `lastUserSignalAt > lastFailureAt` 且 `lastUserSignalKind = "cancel"`，cancel 信号已经覆盖 retry：master 不调度，写 `task_retry_skipped{reason: "user_cancel_supersedes"}`，并保持 task 在 `failed`（cancel 路径会另行把状态改为 `cancelled`）。
+ 1. 如果 `lastUserSignalAt > lastFailureAt` 且 `lastUserSignalKind = "cancel"`，cancel 信号已经覆盖 retry：master 不调度，写 `task_retry_skipped{reason: "user_cancel_supersedes"}`，并保持 task 在 `failed`。`failed` 上的 cancel 是抑制 retry 的用户信号 / resolution 事件，不是 `failed → cancelled` 状态转移。
  2. 如果 `lastUserSignalAt > lastFailureAt` 且 `lastUserSignalKind = "pause"`，pause 信号挂起 retry：master 不调度，写 `task_retry_skipped{reason: "user_pause_active"}`；resume 后下一轮调度可继续。
  3. 否则正常走 retry 调度。
-- budget_overflow 与 retry 互斥：`task.budget` 任意一项耗尽时 master 写 `task_retry_exhausted{reason: "non_transient", failureClass: "budget_overflow"}` 直接落 `failed` + `blockedReason="retry_exhausted"`，不进入退避调度、不写 `task_retry_scheduled`、不消耗 retry 配额；客户端面板对 budget_overflow 失败仅启用 `cancel`（与 retry_exhausted 一致）。
+- budget_overflow 与 retry 互斥：`task.budget` 任意一项耗尽时 master 写 `task_retry_exhausted{reason: "non_transient", failureClass: "budget_overflow"}` 直接落 `failed` + `blockedReason="retry_exhausted"`，不进入退避调度、不写 `task_retry_scheduled`、不消耗 retry 配额；客户端面板对 budget_overflow 失败仅启用 `cancel`（与 retry_exhausted 一致），但该 cancel 只写用户信号 / resolution 事件，不得把 `failed` 转为 `cancelled`。
 - retry × CriticalNodePolicy 重审：retry 派发的新 ExecuteTaskJob 在每次 tool call 之前必须重新走 `Pol.evaluate(toolCall)`，不允许沿用上次失败时的 policy 决策；policy 配置可能已 hot-reload，且 `risk_class=high` 的 skill 在 retry 路径上仍然必须走 `awaiting_critical_node` 拦截（不缓存上次 approve 结果）。
 - plan_update × retry 配额重置：当用户在 task 处于 `failed` 时通过 `update_plan` 工具或 `plan_update` 守卫决策提交新计划，master 必须把 `failed → queued` 的转移和 PlanRevision 写入、ChangeRecord 写入、retry 状态重置串成同一原子事务，保证"切了 plan 之后旧的 retry 配额不会跨域生效"：
  1. 事务前置条件：`task.status = failed`、新计划已通过 `confirm_plan` 守卫决策、`task.lastUserSignalKind ≠ "cancel"`（cancel 优先级仍然高于 plan_update）。
@@ -1053,12 +1090,12 @@ Task 状态机不变量：
  - (d) 写 `task_retry_reset_by_plan_update{taskId, oldAttemptCount, oldFailureClass, changeRecordId, planRevisionId, at}`；
  - (e) 写状态转移 `failed → queued`，并派发新的 `ExecuteTaskJob`（`fencingToken` 单调递增、`planRevisionId` 指向新 revision，禁止复用旧 fencingToken）。
  3. 任意步骤失败：master 必须把已写入的 PlanRevision 标 `status=draft` / 删除、ChangeRecord 不写入、保留旧 retry 状态，并写 `task_state_transition_blocked{from: "failed", to: "queued", reason: "plan_update_retry_reset_failed"}`；事务由验收 40 兜底。
- 4. 与 cancel/pause 优先级的关系：本规则严格弱于 cancel/pause —— 若事务执行期间用户写入 cancel 信号（`lastUserSignalAt` 推进到事务起始时间之后），master 必须 abort 事务并把 task 留在 `failed`，让 cancel 路径接管（同 cancel 优先级合同）。
+ 4. 与 cancel/pause 优先级的关系：本规则严格弱于 cancel/pause —— 若事务执行期间用户写入 cancel 信号（`lastUserSignalAt` 推进到事务起始时间之后），master 必须 abort 事务并把 task 留在 `failed`，让 retry-skip 路径接管（同 cancel 优先级合同）。
  5. 与用户显式重试（`task_manual_retry_requested`）的边界：用户显式重试不改变 plan，仅清零 retry 计数；plan_update 同时改 plan 和清零 retry，两者不复用同一事件 kind，不复用同一 metric。
 
 ### 9.2 Thread 状态
 
-`chatting` / `planning` / `waiting_confirmation` / `working` / `blocked` / `awaiting_critical_node` / `idle`
+`chatting` / `planning` / `waiting_confirmation` / `working` / `blocked` / `paused` / `awaiting_critical_node` / `idle`
 
 ### 9.3 Plan 状态
 
@@ -1213,6 +1250,7 @@ type ExecutorEvent =
  | { kind: "subagent_completed", subagentId, summaryRef, at }
  | { kind: "critical_node_hit", policyId, action, at }
  | { kind: "executor_paused", reason, at }
+ | { kind: "task_resumed", taskId, resumedByUserId, at }
  | { kind: "executor_finished", outcome: "completed" | "failed" | "cancelled", summaryRef, at }
  | { kind: "executor_heartbeat", at }
  | { kind: "task_retry_scheduled", taskId, attemptCount, maxRetries, failureClass, nextRetryAt, at }
@@ -1227,12 +1265,12 @@ type ExecutorEvent =
  | { kind: "task_schema_migrated", taskId, fromVersion: 1, toVersion: 2, migratedFields: string[], at }
  | { kind: "task_schema_migration_failed", taskId, fromVersion: 1, toVersion: 2, errorClass: "io_error"|"schema_invalid"|"concurrent_write", at }
  | { kind: "task_retry_skipped", taskId, reason: "user_cancel_supersedes" | "user_pause_active", lastUserSignalAt, attemptCount, at }
- | { kind: "task_retry_reset_by_plan_update", taskId, oldAttemptCount, oldFailureClass: "transient_error"|"assertion_error"|"permission_error"|"user_cancelled"|null, changeRecordId, planRevisionId, fencingToken, at }
+ | { kind: "task_retry_reset_by_plan_update", taskId, oldAttemptCount, oldFailureClass: "transient_error"|"assertion_error"|"permission_error"|"user_cancelled"|"budget_overflow"|null, changeRecordId, planRevisionId, fencingToken, at }
  | { kind: "client_ack", threadId, cursor, ackedAt, at }
  | { kind: "sse_ack_missing", threadId, taskId?: string, lastSentEventId, lastAckedEventId, gapEvents, at }
  | { kind: "sse_replay_emitted", threadId, fromEventId, toEventId, eventCount, reason: "ack_missing"|"reconnect"|"cursor_below_buffer", at }
  | { kind: "sse_replay_truncated", threadId, droppedEventCount, oldestRetainedEventId, reason: "buffer_overflow"|"max_age_reached", at }
- | { kind: "task_action_denied", taskId, requestedAction: "retry"|"skip"|"cancel", reason: "not_owner"|"invalid_state"|"terminal_state", requestedByUserId, at }
+ | { kind: "task_action_denied", taskId, requestedAction: "retry"|"skip"|"pause"|"resume"|"cancel"|"retry-history-view"|"team_cancel"|"teammate_approve"|"teammate_reject", reason: "not_owner"|"invalid_state"|"terminal_state", requestedByUserId, at }
  | { kind: "notify_throttled", taskId, providerId, target, reason: "duplicate_retry_window"|"global_rate_limit", suppressedNotificationKind: "task_failed"|"task_retry_started"|"task_retry_exhausted"|"task_blocked", windowStartedAt?: string, at }
  | { kind: "events_jsonl_rotated", taskId, archivedFile, archivedSize, archivedAgeDays, reason: "size_overflow"|"age_overflow", at }
  | { kind: "events_jsonl_rotation_failed", taskId, errorClass: "io_error"|"compress_error"|"rename_error", at }
@@ -1288,7 +1326,8 @@ type TaskControl = {
 
 Executor 在每次 tool call 前后检查 `control.json`，按 graceful 策略响应：
 
-- `pause`：完成当前 tool call → 写 `executor_paused` 事件 → 释放 lock 但保留 lease。
+- `pause`：完成当前 tool call → 写 `executor_paused` 事件 → `task.status=paused` → 释放 job lock/lease；暂停态不占用 executor。
+- `resume`：仅由 master 处理，校验 `task.status=paused` 后写 `task_resumed` 事件并把 task 置回 `queued`，等待重新 lease。
 - `cancel`：完成当前 tool call → 写 `executor_finished{outcome: cancelled}` → 释放 lock。
 - `revise`：完成当前 tool call → 加载新 revision → 重新进入 loop。
 - 强杀（超时回退）：master 在等待 graceful stop 超过 N 秒（默认 60s）后，把 job 标记 `failed_timeout`、强制释放 lock，等下次重排。
@@ -1447,7 +1486,7 @@ Skill metadata 应包含：`name` / `description` / `when_to_use` / `allowed_too
 
 输出（结构化 JSON，温度 0）：
 
-- `intent` ∈ {`chat`, `new_task`, `task_update`, `plan_update`, `confirm_task`, `confirm_plan`, `progress_query`, `cancel_task`, `irrelevant`}。
+- `intent` ∈ {`chat`, `new_task`, `task_update`, `plan_update`, `confirm_task`, `confirm_plan`, `progress_query`, `pause_task`, `resume_task`, `cancel_task`, `irrelevant`}。
 - `targetTaskId` / `targetPlanId`（可选）。
 - `requiresUserConfirmation` / `confidence` / `reason`。
 
@@ -1599,9 +1638,10 @@ sequenceDiagram
 
 Executor 在每次 tool dispatch 前调用 `evaluatePolicies(toolCall, context)`：
 
-1. 加载 policies 按优先级合并（global → user → thread → skill，后者覆盖前者）。
+1. 加载 policies 并按 scope 计算命中集合（built-in → global → user → thread → skill）；低层 scope 只能增加约束，不得降级高层 / 内置策略。
 2. 命中条件：matcher 匹配本次 tool call 的属性。
-3. 命中后按 action 执行：
+3. 多条命中时按严格度取最终 action：`block > require_approval > log_only`。
+4. 命中后按 action 执行：
  - `require_approval` → 写 `critical_node_hit` 事件 → `task.status = awaiting_critical_node` → 中止本次 tool call → 等 `control.json signal=resume / cancel`。
  - `block` → 写事件、跳过本次 tool call、继续 loop。
  - `log_only` → 写事件、继续 tool call。
@@ -1614,10 +1654,10 @@ Executor 在每次 tool dispatch 前调用 `evaluatePolicies(toolCall, context)`
 
 ### 15.3 v1 默认值
 
-- 空数组：v1 不强制任何关键节点拦截。
-- 用户跑起来后按需新增。
+- 内置高风险 skill 审批基线：`risk_class=high` 的 skill 默认触发 `require_approval`。
+- 除该基线外，用户可配置策略默认为空数组；用户可在运行后新增外发、文件覆盖、预算溢出等审批或阻断策略。
 
-> retry 路径上的 policy 必须重审：retry 触发 `failed → queued` 派发新 ExecuteTaskJob 后，新 executor 在每次 tool call 前必须重新走 `Pol.evaluate(toolCall)`，不允许沿用上次失败前的 policy 决策（policy 配置可能在两次执行之间 hot-reload）。`risk_class=high` 的 skill 在 retry 路径上仍必须走 `awaiting_critical_node` 拦截，不缓存上次 approve 结果；这是 v1 retry 安全的最后一道闸。
+> retry 路径上的 policy 必须重审：retry 触发 `failed → queued` 派发新 ExecuteTaskJob 后，新 executor 在每次 tool call 前必须重新走 `Pol.evaluate(toolCall)`，不允许沿用上次失败前的 policy 决策（policy 配置可能在两次执行之间 hot-reload）。`risk_class=high` 的 skill 在 retry 路径上仍必须由内置 `kind: skill, riskClass: high` 策略拦截，不缓存上次 approve 结果；这是 v1 retry 安全的最后一道闸。
 
 > Team 路径上 policy 必须按 teammate 独立评估：每个 teammate 在自己的每次 tool dispatch 前独立走 `Pol.evaluate(toolCall)`，不与其它 teammate 共享决策；同一 policy 对 teammate A approve 后，对 teammate B 必须重新评估，不得缓存审批结果。`scope: skill` policy 按 roster slot 的 `persona` 分流；v1 `argMatch` 只支持顶层字段字面量匹配（复杂 `$slot.persona` 占位表达式走 v2）。`kind: tool, toolName: "team", action: require_approval` 可以在 `team` 工具调用本身之前拦截，由父 task ownerUser 审批。详见 §24。
 
@@ -1633,7 +1673,7 @@ Executor 在每次 tool dispatch 前调用 `evaluatePolicies(toolCall, context)`
  - `messages`：对话 token 流。
  - `values`：thread / task / plan 状态快照。
  - `custom`：业务事件（task_started / plan_revised / guard_decision / critical_node_hit / guard_degraded / task_blocked / task_block_resolved / team_* / teammate_* / work_item_* 见 §10.2 ExecutorEvent kinds 完整清单 ...）。
-- **`task_blocked` payload 客户端契约**：客户端收到 SSE `custom: task_blocked{taskId, blockedReason, suggestedActions}` 后必须按 `suggestedActions` 渲染按钮：`retry_exhausted` 仅启用 `cancel`；`retry_pending` 启用 `cancel` 并在 `nextRetryAt` 倒计时显示；`awaiting_user_action` 与 `non_idempotent_tool_in_flight` 启用三动作。用户点击后 client 走 `POST /api/tasks/{id}/retry`、`POST /api/tasks/{id}/skip`、`POST /api/tasks/{id}/cancel`；server 在写状态翻转前先 append `task_block_resolved` 事件。
+- **`task_blocked` payload 客户端契约**：客户端收到 SSE `custom: task_blocked{taskId, blockedReason, suggestedActions}` 后必须按 `suggestedActions` 渲染按钮：`retry_exhausted` 仅启用 `cancel`；`retry_pending` 启用 `cancel` 并在 `nextRetryAt` 倒计时显示；`awaiting_user_action` 与 `non_idempotent_tool_in_flight` 启用三动作。用户点击后 client 走 `POST /api/tasks/{id}/retry`、`POST /api/tasks/{id}/skip`、`POST /api/tasks/{id}/cancel`；server 在写状态翻转前先 append `task_block_resolved` 事件。`skip` 的含义固定为跳过当前 blocked PlanStep / in-flight tool call 并继续执行，不创建 task 终态。
 
 ### 16.1 客户端 ack 协议
 
@@ -1733,7 +1773,7 @@ Team 相关事件作为 **custom kind** 注入 §16 现有父 task SSE 流，**�
 on bot-runtime startup:
  1. 锁定 .lock，加载 .runtime-info.json
  2. 扫 jobs/locked/，对每个 job：
- - 若 leaseExpireAt 已过 → 标 failed_timeout 移到 failed/，task.status 回 confirmed
+ - 若 leaseExpireAt 已过 → 标 failed_timeout 移到 failed/，不得把 task.status 回退为 `confirmed`；若 task.status 仍为 `queued`，保持 `queued` 等待 master 重新派发；若 task.status 已为 `running`，交由 step 5 与 §17.3 in-flight tool call 恢复流程处理为 `blocked` / 跳过 / 重做
  - 否则保留（worker 还在跑）
  3. 扫 webhooks/<channel-type>/，超过 N 天的 dedupe 记录清理
  4. 扫 chat-claims/，对每条对应的 binding 校验 thread/task 是否存在；不存在 → 标 orphan
@@ -1744,7 +1784,8 @@ on bot-runtime startup:
  - 写一条 `runtime.jsonl` 事件 `retry_scheduler_lock_reclaimed{previousHolder, previousFencingToken, leaseExpireAt, currentRuntimeId, at}`
  - 写一条 `retry_scheduler_lock_stolen{previousHolder, currentHolder=currentRuntimeId, fencingToken=newFencingToken}` 事件（与 §4.7.1 保持一致）
  - 不删除 stale 文件；运维通过 `cleanup_stale_locks` 周期任务清理过期 stale 文件（默认 30 天）
- 7a. 扫 tasks/<task-id>/teams/<team-id>/，按 §9.5-§9.7 状态机恢复（详见 §24.10）：
+ 7a. 扫 state/_transactions/<tx-id>.json，按 §17.4 文件级事务日志恢复 prepared / preparing 事务；无法自动恢复时把相关 task 置 blocked 并写 `transaction_recovery_required`
+ 7b. 扫 tasks/<task-id>/teams/<team-id>/，按 §9.5-§9.7 状态机恢复（详见 §24.10）：
  - team.status ∈ {completed, failed, cancelled}：跳过（终态）
  - team.status = forming：标 failed，写 `team_recovery_failed{reason:"forming_at_crash"}`，清场所有 teammate 目录；不尝试续跑
  - team.status ∈ {active, finishing}：
@@ -1767,6 +1808,52 @@ on bot-runtime startup:
  - `idempotent_write`：对每个 `preStateHashes[path]` 重新计算当前 sha256；若全部一致则重做（写入未发生），任何一个不一致则跳过该 tool call 并写 `tool_call_skipped{reason: "preStateHashMismatch"}` 事件。
  - `non_idempotent`：直接 `task.status = blocked`，写 `executor_blocked{reason: "non_idempotent_tool_in_flight", callId}`，等用户在客户端选择"重试 / 跳过 / 取消"。
 - in-flight 检测必须在 Executor 进入新 loop 之前完成；不允许跳过。该流程构成验收标准 11 的实现基础。
+
+### 17.4 文件级事务日志
+
+文件系统状态库通过 atomic rename 提供单文件原子性；涉及多个文件的不变量必须显式使用事务日志，不能只依赖写入顺序。
+
+适用范围：
+
+- PlanRevision + ChangeRecord + task.json + events.jsonl 的联动写入。
+- `failed → queued` retry 调度中 `task_retry_scheduled` 事件、`task.retry.lastEventId`、`task.status` 的联动写入。
+- `plan_update` 触发 retry reset 时的新旧 plan revision、ChangeRecord、retry 状态和 ExecuteTaskJob 派发。
+- artifact 归档时 ArtifactRecord、文件移动、ChangeRecord 的联动写入。
+
+目录：`data/instances/<runtime-id>/state/_transactions/<tx-id>.json`。
+
+```ts
+type FileTransaction = {
+ id: string
+ kind: "plan_revision" | "retry_requeue" | "plan_update_retry_reset" | "artifact_archive" | string
+ status: "preparing" | "prepared" | "committed" | "rolled_back"
+ participants: Array<{
+   path: string
+   expectedSha256?: string
+   tmpPath?: string
+   operation: "replace" | "append" | "rename" | "mkdir"
+ }>
+ eventIds: string[]
+ recovery: "replay_commit" | "rollback_tmp" | "manual_block"
+ createdAt: string
+ updatedAt: string
+}
+```
+
+提交流程：
+
+1. 写 `preparing` 事务文件并 fsync。
+2. 校验所有 `expectedSha256` / 版本号，失败则 `rolled_back`，不修改正式文件。
+3. 写所有 `.tmp` 文件并 fsync；append-only 事件先写带 `txId` 的临时片段或预留 event id。
+4. 把事务标记为 `prepared`。
+5. 按参与者顺序执行同目录 atomic rename / append；全部成功后标记 `committed`。
+6. 任一步失败时保留旧正式文件，清理 tmp，标记 `rolled_back`，并写对应 `task_state_transition_blocked` / `artifact_consistency_warning` / `transaction_recovery_required` 事件。
+
+重启恢复：
+
+- `committed`：跳过；事务文件保留至少 7 天。
+- `preparing`：删除 tmp，标记 `rolled_back`。
+- `prepared`：若所有正式文件已经匹配目标 sha256，则补写 `committed`；若只有部分参与者完成，按 `recovery` replay 剩余 rename / append；无法判断时不得猜测，必须把相关 task 置 `blocked` 并写 `transaction_recovery_required{txId}`。
 
 ### 17.5 TaskRetryState schema 迁移
 
@@ -1881,7 +1968,7 @@ rotate(taskId, active_path, reason):
 
 Team 终态后：team.status 转吸收态的同时不立刻清目录；`RUNTIME_TEAM_DIRECTORY_ARCHIVE_DAYS`（默认 30）天后由独立清理 fiber 把整个 `teams/<team-id>/` 目录搬到 `_archive/teams/<team-id>/`（目录级 `.tar.gz`），写 `team_directory_archived{teamId, archivedPath, archivedAt}` 到父 task events.jsonl；客户端历史查询可按 team-id 走归档流。
 
-### 17.4 双重确认幂等
+### 17.7 双重确认幂等
 
 - confirmation 携带 nonce + 状态机检查；已 confirmed 状态忽略二次 confirm。
 - 同一 webhook event id 重复投递时，inbound 幂等保证只产生一次 `GuardDecision`。
@@ -1971,11 +2058,11 @@ Team 终态后：team.status 转吸收态的同时不立刻清目录；`RUNTIME_
  - `runtime_shutdown_total`（labeled by `role=master|worker|hybrid`、`reason=signal|timeout`）。graceful 退出可观测。
  - `task_blocked_total`（labeled by `blockedReason`）。按四枚举聚合阻塞分布。
  - `task_block_resolution_total`（labeled by `blockedReason`、`action=retry|skip|cancel`）。验证三动作面板用户决策路径是否被使用。
- - `task_retry_reset_by_plan_update_total`（labeled by `oldFailureClass=transient_error|assertion_error|permission_error|user_cancelled|none`）。统计 plan_update 触发的 retry 配额重置次数，按旧 failureClass 区分；与 `task_manual_retry_total` 区分（后者仅清零 retry 但不改 plan）。配套 alert：单 thread 30 分钟内 `> 5` 次 reset 表明 plan 在重复抖动，需要回归 MessageGuard / PlanRevision eval。
+ - `task_retry_reset_by_plan_update_total`（labeled by `oldFailureClass=transient_error|assertion_error|permission_error|user_cancelled|budget_overflow|none`）。统计 plan_update 触发的 retry 配额重置次数，按旧 failureClass 区分；与 `task_manual_retry_total` 区分（后者仅清零 retry 但不改 plan）。配套 alert：单 thread 30 分钟内 `> 5` 次 reset 表明 plan 在重复抖动，需要回归 MessageGuard / PlanRevision eval。
  - `sse_ack_missing_total`（labeled by `threadId`）。客户端 ack 心跳超时计数，> 5/min 提示客户端版本 / 浏览器后台异常或 server overload。
  - `sse_replay_emitted_total`（labeled by `reason=ack_missing|reconnect|cursor_below_buffer`）。监控客户端补齐路径分布；`cursor_below_buffer` 占比高表明 buffer 容量需要上调或客户端断线时间过长。
  - `sse_replay_truncated_total`（labeled by `reason=buffer_overflow|max_age_reached`）。> 0 即触发告警，因为客户端必须走 `reload_required` 全量重载，UX 体验下降。`sse_replay_buffer_active_size`（gauge, labeled by `threadId`）作为运维侧的容量参考。
- - `task_action_denied_total`（labeled by `action=retry|skip|cancel`、`reason=not_owner|invalid_state|terminal_state`）。监控客户端三动作越权 / 终态触发分布；`reason=not_owner` 占比 > 5% 表明客户端 SSE 推送跨 thread / 跨 owner，`terminal_state` 占比高表明客户端 UI 在 task 完成 / 取消后未及时移除按钮。
+ - `task_action_denied_total`（labeled by `action=retry|skip|pause|resume|cancel|retry-history-view|team_cancel|teammate_approve|teammate_reject`、`reason=not_owner|invalid_state|terminal_state`）。监控客户端动作越权 / 终态触发分布；`reason=not_owner` 占比 > 5% 表明客户端 SSE 推送跨 thread / 跨 owner，`terminal_state` 占比高表明客户端 UI 在 task 完成 / 取消后未及时移除按钮。
  - `notify_throttled_total`（labeled by `provider`、`reason=duplicate_retry_window|global_rate_limit`）。监控 retry × notify 节流命中分布；`duplicate_retry_window` 占比高说明同一 task 重试事件密集（可能 retry 风暴），`global_rate_limit` 命中提示 IM 渠道整体限频被打满，可能需要扩 ChannelProvider 出站并发或调高 `RUNTIME_NOTIFY_GLOBAL_RPM`。
  - `events_jsonl_rotated_total`（labeled by `taskId`、`reason=size_overflow|age_overflow`）。归档触发计数；`size_overflow` 占比高说明事件密度高（高频 tool_call 或 retry 风暴），`age_overflow` 占比高说明 task 跨度长。
  - `events_jsonl_active_size_bytes`（gauge, labeled by `taskId`）。当前活跃 events.jsonl 文件字节数；超过 `RUNTIME_EVENTS_JSONL_MAX_BYTES * 0.5` 时升预警。
@@ -2074,6 +2161,8 @@ CI 阶段加入"runbook 可执行性测试"：每条 SOP 注入对应 metric 异
 - ArtifactRecord 一致性扫描：构造 `missing` / `extra` / `sha256_mismatch` 三类故障，断言 `artifact_consistency_warning` 事件按 `kind` 区分写出。
 - ChannelProvider 接口：每个 provider 必须有正常 + 错误 + 幂等 + 限流测试。
 - 状态机： §9.1 中每条边都必须有测试；额外覆盖：
+ - `pause` / `resume`：`queued / running / awaiting_critical_node / blocked → paused` 均可进入暂停态；`paused → queued` 仅由 owner resume 触发；paused 不占用 executor lease，cancel / revise 仍可从 paused 发起。
+ - `skip`：仅 `blocked + blockedReason ∈ {awaiting_user_action, non_idempotent_tool_in_flight}` 成功；成功后当前 PlanStep 写 `skipped`、`task_block_resolved{action:"skip"}` 先于 `blocked → queued` 状态转移；其它状态返回 409。
  - `failed → queued` 自动路径仅在 `failureClass="transient_error"` 且 `attemptCount < maxRetries` 且 `now >= nextRetryAt` 同时成立时触发；否则吸收并写 `task_retry_exhausted` 或 `task_state_transition_blocked`。
  - 给定 `failureClass="assertion_error" / "permission_error" / "user_cancelled"` 的失败任务，断言 master 不调用 requeue、`attemptCount` 不增长、不写 `task_retry_scheduled`。
  - `attemptCount = maxRetries` 边界：第 maxRetries 次失败必须写 `task_retry_exhausted{reason: "max_retries"}` 并保持 `failed`。
@@ -2094,14 +2183,14 @@ CI 阶段加入"runbook 可执行性测试"：每条 SOP 注入对应 metric 异
 - replay 修复：模拟"已写 task_retry_scheduled 但 task.json 未翻 queued"的崩溃，新 master 启动后断言能从事件流回放修复，并写 `retry_scheduler_replay_corrected_total += 1`。
 - blockedReason 一致性：构造每条 `failed/blocked` 转移路径，断言 `task.blockedReason` 与触发原因匹配（transient_error + retry 未到 → `retry_pending`；max_retries / 非 transient → `retry_exhausted`；ask_clarification → `awaiting_user_action`；§17.3 `non_idempotent` → `non_idempotent_tool_in_flight`）；缺失时必须写 `task_state_transition_blocked{reason: "missing_blocked_reason"}`。
 - task_blocked 事件 payload：每个 blockedReason 必须给出对应的 `suggestedActions`（`retry_exhausted` → `["cancel"]`；`retry_pending` → `["cancel"]`；`awaiting_user_action` / `non_idempotent_tool_in_flight` → `["retry","skip","cancel"]`）；客户端断言 SSE custom 事件按上述映射启用按钮。
-- 三动作 API：`POST /api/tasks/{id}/skip`、`POST /api/tasks/{id}/cancel` 与现有 `POST /api/tasks/{id}/retry` 在 server 端必须先写 `task_block_resolved` 再翻状态；断言 `task_block_resolution_total` 三 label 各自有非零计数。
+- 三动作 API：`POST /api/tasks/{id}/skip`、`POST /api/tasks/{id}/cancel` 与现有 `POST /api/tasks/{id}/retry` 在 server 端必须先写 `task_block_resolved` 再翻状态；断言 `task_block_resolution_total` 三 label 各自有非零计数。`skip` 仅允许 `task.status=blocked` 且 `blockedReason ∈ {awaiting_user_action, non_idempotent_tool_in_flight}`，成功后当前 PlanStep 变为 `skipped`，task 回到 `queued`。
 - stale 锁清理：fake clock 推进让 `state/_locks/retry-scheduler.lock.leaseExpireAt < now`，启动新 runtime；断言：
  1. 原 lock 文件被 rename 为 `retry-scheduler.lock.stale.<oldFencingToken>`，文件实体保留可读。
  2. `runtime.jsonl` 写 `retry_scheduler_lock_reclaimed{cause: "stale_lease"}` 一条。
  3. `events.jsonl` 写 `retry_scheduler_lock_stolen` 一条（cause 字段不重复）。
  4. `retry_scheduler_lock_reclaimed_total{cause="stale_lease"} += 1`，`retry_scheduler_lock_stale_files` gauge += 1。
  5. 新 runtime 持有新 lock 文件 `state/_locks/retry-scheduler.lock`，fencingToken 严格大于 stale 文件中的旧 token。
-- cancel × retry race：mock 一个 transient_error 失败 task（lastFailureAt=t1），写 cancel 信号到 control.json（lastUserSignalAt=t2 > t1）；fake clock 推进过 nextRetryAt；断言 master 不调度、`task_retry_skipped{reason: user_cancel_supersedes}` 一条、task.status 仍 failed（直到 cancel 路径异步翻 cancelled）；对照组：lastUserSignalAt=t0 < t1 时 master 正常 requeue。
+- cancel × retry race：mock 一个 transient_error 失败 task（lastFailureAt=t1），写 cancel 信号到 control.json（lastUserSignalAt=t2 > t1）；fake clock 推进过 nextRetryAt；断言 master 不调度、`task_retry_skipped{reason: user_cancel_supersedes}` 一条、task.status 仍 failed（不得异步翻 `cancelled`）；对照组：lastUserSignalAt=t0 < t1 时 master 正常 requeue。
 - pause × retry race：同上，lastUserSignalKind=pause；断言 `task_retry_skipped{reason: user_pause_active}`；resume 后下一轮调度恢复。
 - retry × 既有合同联合测试：构造一个 task，组合验证 4 条注脚：
  1. subagent retry 不级联：父 task 调用 `task` 派生 subagent；subagent 内部 transient_error 重试 2 次后失败上报；断言父 task 的 `attemptCount` 不增长，`task_retry_scheduled` 不被父 task 写入；父 task 收到 `subagent_completed{outcome: failed}` 后按自身策略决定。
@@ -2128,11 +2217,11 @@ CI 阶段加入"runbook 可执行性测试"：每条 SOP 注入对应 metric 异
  4. 不同 kind：同 task / 同 target 切到 `kind: task_blocked`，断言不命中窗口（kind 不同），ChannelProvider 实际发送。
  5. 全局限频：构造同 instance / 同 provider / 同 target 在 1 分钟内触发 35 次（不同 task），第 31 次开始命中 `RUNTIME_NOTIFY_GLOBAL_RPM=30`，断言后续写 `notify_throttled{reason: "global_rate_limit"}`。
  6. 用户手动重试重置：在窗口期内写 `task_manual_retry_requested`，断言 (taskId, providerId, target) 窗口被清；下一次 notify 实际发送。
-- POST 三动作 owner 校验：mock 一个 task（ownerUserId=U1, status=failed, blockedReason=retry_pending）：
+- POST 动作 owner 校验：mock 一个 task（ownerUserId=U1, status=failed, blockedReason=retry_pending）：
  1. owner 路径：U1 POST /api/tasks/{id}/retry，断言 200 + `task_block_resolved` 事件 + 状态翻转，无 `task_action_denied`。
  2. 越权路径：U2 POST /api/tasks/{id}/retry，断言 HTTP 403 + `task_action_denied{reason: "not_owner", requestedByUserId=U2}` 事件先于任何状态翻转写入；状态保持 failed；`task_action_denied_total{action="retry", reason="not_owner"} += 1`。
  3. 终态路径：把 task.status=completed，U1 POST /api/tasks/{id}/retry，断言 HTTP 409 + `task_action_denied{reason: "terminal_state"}`、`task_action_denied_total{action="retry", reason="terminal_state"} += 1`；status 保持 completed。
- 4. 状态不允许：task.status=running, U1 POST /api/tasks/{id}/skip（skip 仅允许 blocked / failed），断言 HTTP 409 + `task_action_denied{reason: "invalid_state"}`。
+ 4. 状态不允许：task.status=running, U1 POST /api/tasks/{id}/skip（skip 仅允许 blocked 且 blockedReason 支持跳过），断言 HTTP 409 + `task_action_denied{reason: "invalid_state"}`。
  5. 校验顺序：U2 + status=completed 同时违反，必须先写 `task_action_denied{reason: "not_owner"}`（owner 校验先于 status 校验），不暴露状态信息。
  6. cancel 终态：task.status=cancelled, U1 POST /api/tasks/{id}/cancel，断言 HTTP 409 + `task_action_denied{reason: "terminal_state"}`，与 retry/skip 终态拒绝路径一致。
 - SSE ack + replay 协议：用 mock SSE 客户端 + fake clock 验证：
@@ -2179,7 +2268,7 @@ CI 阶段加入"runbook 可执行性测试"：每条 SOP 注入对应 metric 异
 
 ### 20.3 Agent eval（必须）
 
-三条关键路径强制覆盖：
+五条强制 agent eval 覆盖：
 
 1. **MessageGuard eval**：固定 200 条消息样本（含模糊确认、无关闲聊、变更请求、查询进度等），LLM 输出与人工标注的 intent 一致率 ≥ 90%；intent 维度 micro-F1 ≥ 0.85；低于阈值时阻塞发布并回归 prompt / few-shot。
 2. **TaskConfirmation eval**：模拟 50 条候选 task draft，验证 owner 用户的"确认 / 拒绝 / 修改"信号驱动状态机；owner 与非 owner 的"确认信号"分别 ≥ 95% 与 0% 进入正式确认门禁。
@@ -2211,7 +2300,7 @@ eval 用 deer-flow 的 evals 模式参考；结果落 `tests/evals/results/<date
 | transcript 脱敏 | 写入前 regex sanitize（Lark / Slack token、API key、email、phone） |
 | 日志格式 | JSON，带 runtimeId / role / threadId / taskId / fencingToken |
 | Trace 透传 | OTel traceparent 写进 `jobs/<job-id>.json` |
-| 测试覆盖 | 数据模型 schema 100%；状态机每条转移；三条关键路径强制 agent eval |
+| 测试覆盖 | 数据模型 schema 100%；状态机每条转移；五条强制 agent eval |
 | 重试调度器轮询 | `RUNTIME_RETRY_POLL_MS` 默认 5000；锁路径 `state/_locks/retry-scheduler.lock`，lease 60s；候选按 `nextRetryAt` 升序处理 |
 | 用户手动重试 API | `POST /api/tasks/{id}/retry`，写 `task_manual_retry_requested` 后重置 `task.retry.attemptCount=0`、`failureClass=null`、`nextRetryAt=null`，再翻 `failed → queued` |
 | 重试调度器锁字段 | `state/_locks/retry-scheduler.lock` 文件 JSON：`{lockHolderRuntimeId, acquiredAt, leaseExpireAt, fencingToken}`，lease 默认 60s |
@@ -2267,11 +2356,13 @@ eval 用 deer-flow 的 evals 模式参考；结果落 `tests/evals/results/<date
 
 ---
 
-## 23. 第一版落地范围与风险
+## 23. 第一版一次性交付落地范围与风险
 
 ### 23.1 落地范围
 
-第一版必做：
+以下全部属于本次一次性交付范围。列表按工程依赖排序，允许并行实现，但最终验收必须全部满足。
+
+第一版一次性交付必做：
 
 - 文件系统状态库与 ID 规范（含 `.lock`、`.runtime-info.json`、fencing token）。
 - User / Thread / TaskList / Task / Plan / PlanRevision / ChangeRecord / ArtifactRecord / SkillManifest / GuardDecision / ChannelConfig / ChannelBinding / CriticalNodePolicy 数据模型。
@@ -2285,11 +2376,11 @@ eval 用 deer-flow 的 evals 模式参考；结果落 `tests/evals/results/<date
 - 通用 channel 配置、多绑定、入站幂等、出站 job、脱敏配置 API。
 - 飞书 provider 的 webhook、长连接、文本消息、群聊路由、Guardian、Operator OpenId 映射。
 - 消息守卫两阶段判断 + LLM fallback。
-- CriticalNodePolicy 加载、评估与 `awaiting_critical_node` 状态机。
+- CriticalNodePolicy 加载、评估、内置高风险 skill 审批基线与 `awaiting_critical_node` 状态机。
 - SSE 流式协议 + cursor 续传。
 - 故障恢复：lock + fencing token + 重启扫描 jobs/locked。
 - Secret / PII 脱敏。
-- 三条关键路径 agent eval。
+- 五条强制 agent eval：MessageGuard / TaskConfirmation / PlanRevision / FailureClassClassification / TeamOrchestration。
 - Agent Teams 能力（详见 §24）：
  - Team / TeamRosterSlot / TeamWorkItem / TeamMessage / Teammate 数据模型（§7.12-§7.16）。
  - 9 个工具：`team` + `publish_work` / `claim_work` / `release_claim` / `complete_work` / `fail_work` / `post_message` / `read_messages` / `finish_team`（§11.3 - §11.5）。
@@ -2303,26 +2394,26 @@ eval 用 deer-flow 的 evals 模式参考；结果落 `tests/evals/results/<date
  - Team 面板 + 9 个新 HTTP 端点 + owner 校验（§24.8）。
  - TeamOrchestration eval（§20.3 第 5 条）。
 
-第一版暂缓：
+本次一次性交付明确暂缓：
 
 - 多机部署（master / worker 物理分离 + 共享存储 / RPC）。
 - 完整 MCP 管理 / Skill 市场 / Skill trust list。
 - Plan revision 支持 patch（小变更不全量重写）。
 - 关键节点策略图形化配置面板。
 - 多 active task。
-- 数据保留与清理策略（GDPR / 磁盘满）。
+- 合规级数据保留与删除策略（GDPR、法务留存、按租户保留期配置）。运行正确性所需的 events.jsonl 归档、team 目录归档、dedupe TTL、stale lock 清理仍属于 v1 必做。
 - prompt 版本化、模型路由 / fallback / 速率限制。
 - 国际化（zh / en）。
 - Slack、企业微信、邮件等多 provider。
 - 企业级权限。
-- retry 机制扩展项 — 任何一项都需开新 RFC，不在 v1：
+- retry 机制边界外扩展项 — 任何一项都需开新 RFC，不在本次一次性交付实现：
  - 多机 standby master + fencingToken HA 部署。
  - 独立 RetryPolicy（per-skill / per-task override）。
  - SLA budget split（把 retry 时间从 task budget 拆出来计算）。
  - retry 跨 subagent 深度 ≥ 2 传播。
- - retry storm 自动节流 / circuit breaker（后续假设，不在 v1 引入）。
+ - retry storm 自动节流 / circuit breaker（后续假设，不在本次一次性交付引入；本次只做通知节流与观测告警）。
  - per-tenant retry 配额、retry 任务数据库审计、retry 跨 thread 共享 quota。
-- Agent Teams 扩展项 — 任何一项都需开新 RFC，不在 v1：
+- Agent Teams 边界外扩展项 — 任何一项都需开新 RFC，不在本次一次性交付实现：
  - 跨 task / 跨 thread 的持久 team。
  - Team 内再派 team（nested teams）。
  - Teammate 之间的直接 tool 互调 / RPC。
@@ -2334,7 +2425,7 @@ eval 用 deer-flow 的 evals 模式参考；结果落 `tests/evals/results/<date
  - `team` 工具图形化 roster 配置面板。
  - LLM-as-reviewer 自动互评。
 
-v1 的 retry 约束清单（白名单视图）— 仅以下行为允许出现在 v1：
+v1 的 retry 约束清单（白名单视图）— 仅以下行为允许出现在本次一次性交付：
 
 1. 单机 hybrid master + 单写者锁（`state/_locks/retry-scheduler.lock`）。
 2. transient_error 自动重试，attemptCount ≤ 2，退避 30s/120s/300s。
@@ -2346,9 +2437,9 @@ v1 的 retry 约束清单（白名单视图）— 仅以下行为允许出现在
 8. kill-9 e2e 90s SLA。
 9. 与之相关的 §19 metric 与 §10.1 验收。
 
-任何超出该清单的 retry 行为都属于 v2 / 后续 RFC。
+任何超出该清单的 retry 行为都属于后续 RFC。
 
-v1 的 team 约束清单（白名单视图）— 仅以下行为允许出现在 v1：
+v1 的 team 约束清单（白名单视图）— 仅以下行为允许出现在本次一次性交付：
 
 1. 单 parent task 至多 1 个并存 team（`RUNTIME_TASK_MAX_CONCURRENT_TEAMS=1`）。
 2. Team 寄生在父 task 内，不产生新 Task / 新 ThreadLoop。
@@ -2363,7 +2454,7 @@ v1 的 team 约束清单（白名单视图）— 仅以下行为允许出现在 
 11. 父 task cancel / pause / plan_update 必须先级联 cancel team 并等终态。
 12. 与之相关的 §19 metric（Agent Teams 组）与 §10.1 验收 57-69。
 
-任何超出该清单的 team 行为都属于 v2 / 后续 RFC。
+任何超出该清单的 team 行为都属于后续 RFC。
 
 ### 23.2 主要风险
 
@@ -2443,7 +2534,7 @@ master 在写完 `task_retry_scheduled` 事件但未完成 task.json 状态翻�
 
 - **plan 切换但 retry 未重置**：步骤 (a)-(b) 成功而 (c)-(d) 失败的极端情况下，task 的 PlanRevision 已切换、ChangeRecord 已记录，但 `task.retry.attemptCount` 仍指向旧 plan 的失败累积。下一轮 retry scheduler 会按"旧的 attemptCount + 旧 failureClass"决定是否再调度，导致用户感觉"换了 plan，retry 仍在按旧节奏跑"。事务必须把 (a)-(e) 串成 all-or-nothing；任何一步失败必须回滚已写入的 PlanRevision（由 §17 文件级原子性保证）并写 `task_state_transition_blocked{reason: "plan_update_retry_reset_failed"}`。
 - **retry 重置但 plan 未切换**：步骤 (c) 成功而 (a)-(b) 失败的极端情况，task 的 retry 配额已清零但 plan 仍是旧的。下一次自动 retry 会用旧 plan 重新派发 job，预算清零反而让任务"白白多重试 N 次"。事务顺序固定为 (a)→(b)→(c)→(d)→(e)，前三步任一失败必须回滚已落盘的部分。
-- **cancel 抢占事务窗口**：用户在事务开始与结束之间写入 cancel 信号时，如果没有显式抢占检查，事务可能把 task 推回 `queued`，与 cancel 优先级合同冲突。事务必须在写入 (e) 之前重新读取 `task.lastUserSignalAt / lastUserSignalKind`，发现 `cancel` 立即 abort、保留 task 在 `failed` 让 cancel 路径接管。
+- **cancel 抢占事务窗口**：用户在事务开始与结束之间写入 cancel 信号时，如果没有显式抢占检查，事务可能把 task 推回 `queued`，与 cancel 优先级合同冲突。事务必须在写入 (e) 之前重新读取 `task.lastUserSignalAt / lastUserSignalKind`，发现 `cancel` 立即 abort、保留 task 在 `failed`，由下一轮 retry-skip 路径写 `task_retry_skipped{reason: "user_cancel_supersedes"}`。
 
 每条失败模式必须由 §19 指标暴露：`task_retry_reset_by_plan_update_total{oldFailureClass}` 监控成功路径，`task_state_transition_blocked_total{reason="plan_update_retry_reset_failed"}` 监控事务失败路径，`task_retry_skipped_total{reason="user_cancel_supersedes"}` 监控 cancel 抢占；任意指标短期内异常飙升时升级告警。
 
@@ -2458,12 +2549,12 @@ master 在写完 `task_retry_scheduled` 事件但未完成 task.json 状态翻�
 
 每条失败模式必须由 §19 指标暴露：`sse_ack_missing_total{threadId}` / `sse_replay_emitted_total{reason}` / `sse_replay_truncated_total{reason}` / `sse_replay_buffer_active_size{threadId}`；运维 dashboard 应在同一面板呈现，便于交叉分析（ack 短缺 + buffer 溢出常常同时出现）。
 
-#### 23.2.8f 客户端三动作越权与终态拒绝失败模式
+#### 23.2.8f 客户端动作越权与终态拒绝失败模式
 
-`POST /api/tasks/{id}/{retry|skip|cancel}` 三动作端点引入 server 端两阶段校验后，新增 3 类失败模式：
+`POST /api/tasks/{id}/{retry|skip|pause|resume|cancel}` 动作端点引入 server 端两阶段校验后，新增 3 类失败模式：
 
 - **跨 owner 越权请求**：客户端 SSE 推送跨 thread / 跨 owner（例如 U2 浏览器看到 U1 的 task），UI 显示按钮、用户点击导致 server 端 owner 校验拒绝。`task_action_denied_total{reason="not_owner"}` 短时飙升表明前端 SSE 路由 / thread 隔离逻辑有 bug。修复路径：检查 `/api/threads/{id}/events` 的鉴权与 thread.ownerUserId 过滤。
-- **终态按钮残留**：task 完成 / 取消后客户端 UI 未及时移除三动作按钮，用户点击 → server 拒绝 → UI 提示"无效状态"。`task_action_denied_total{reason="terminal_state"}` > 0 即提示 UI 在终态事件（`executor_finished` / `task_state_transition`）后没有及时刷新。
+- **终态按钮残留**：task 完成 / 取消后客户端 UI 未及时移除动作按钮，用户点击 → server 拒绝 → UI 提示"无效状态"。`task_action_denied_total{reason="terminal_state"}` > 0 即提示 UI 在终态事件（`executor_finished` / `task_state_transition`）后没有及时刷新。
 - **校验顺序泄漏状态**：先校验 status 再校验 owner 时，越权用户能通过 4xx 区分"task 存在但状态错"与"task 不存在 / 不属于自己"，泄漏 task 元数据。本路径校验顺序固定为 owner → status：越权用户对任何 status 都得到 403 not_owner，避免状态信息泄漏。
 
 每条失败模式的兜底 metric：`task_action_denied_total{action, reason}`；运维 dashboard 分按 action 与 reason 双维度展示，便于交叉分析（`retry × not_owner` 与 `cancel × terminal_state` 通常源自不同的 UI bug）。
@@ -2504,7 +2595,7 @@ retry 自动调度 + master 默认调用 `notify_bound_channel` 报告进度后�
 retry 调度器是 v1 的核心能力。如果不显式约束它与 subagent / budget / TaskList ordering / CriticalNodePolicy 的边界，会从单一合同蔓延为破坏既有不变量。新增 4 类需要监控的边界蔓延风险：
 
 - **subagent 失败被父 task retry 链放大**：subagent 内部 retry 配额耗尽后，如果父 task 把 subagent 失败也按 transient_error 处理，就会走父 task retry 路径再分配 retry 配额，整体放大到 subagent×depth × parent retry 次数；§11.2.1 + 验收 46 强制断开级联。
-- **budget overflow 被错误归类为 transient_error**：开发者把 timeout 误标为 `transient_error` 时 master 会反复 retry 已经超预算的 task，浪费配额并堆积 task 在 `failed`；§9.1 注脚把 budget_overflow 显式落终态、不消耗 retry 配额。
+- **budget overflow 被错误归类为 transient_error**：开发者把 timeout 误标为 `transient_error` 时 master 会反复 retry 已经超预算的 task，浪费配额并堆积 task 在 `failed`；§9.1 注脚把 budget_overflow 显式停留在 `failed`、不消耗 retry 配额。
 - **retry 路径偷偷上调任务优先级**：性能优化时容易"加 retry 队列优先级提升"导致用户排队顺序错乱；§7.1.1 注脚 + 验收 48 + `task_state_transition_blocked{reason: "retry_must_not_reorder_tasklist"}` 兜底。
 - **retry 跳过 CriticalNodePolicy 重审**：缓存优化时容易"上次已 approve 就不再走 policy"导致 risk_class=high skill 在 retry 路径上绕过审批；§15 注脚 + 验收 49 强制每次 tool call 重读 policy。
 
