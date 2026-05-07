@@ -81,6 +81,23 @@ export class RetryScheduler {
         },
       );
       void ev;
+      // Acceptance 32: surface a task_blocked{retry_exhausted} with cancel as
+      // the only suggested action — the scheduler will not retry again.
+      const blockedEv = await this.rt.tasks.appendEvent(
+        input.threadId,
+        input.task.id,
+        {
+          kind: 'task_blocked',
+          taskId: input.task.id,
+          threadId: input.threadId,
+          payload: {
+            blockedReason: 'retry_exhausted',
+            suggestedActions: ['cancel'],
+          },
+          at: new Date(this.now()).toISOString(),
+        },
+      );
+      void blockedEv;
       return { outcome: 'exhausted', retry: exhausted };
     }
     const idx = Math.min(cur.attemptCount, BACKOFF_SCHEDULE_MS.length - 1);
@@ -108,6 +125,24 @@ export class RetryScheduler {
       at: new Date(this.now()).toISOString(),
     });
     void ev;
+    // Acceptance 32: surface a task_blocked{retry_pending} so the UI can show
+    // the cancel-only action set while the backoff timer counts down.
+    const blockedEv = await this.rt.tasks.appendEvent(
+      input.threadId,
+      input.task.id,
+      {
+        kind: 'task_blocked',
+        taskId: input.task.id,
+        threadId: input.threadId,
+        payload: {
+          blockedReason: 'retry_pending',
+          suggestedActions: ['cancel'],
+          nextRetryAt: nextAt,
+        },
+        at: new Date(this.now()).toISOString(),
+      },
+    );
+    void blockedEv;
     return { outcome: 'scheduled', nextRetryAt: nextAt, retry: next };
   }
 

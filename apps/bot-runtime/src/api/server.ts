@@ -21,13 +21,17 @@ import {
   releaseInstanceLock,
   type InstanceLockHolder,
 } from '@ai-workflow/fs-store';
+import * as fs from 'node:fs/promises';
+import path from 'node:path';
 
 import { TokenAuthService, parseLocalUserTokens } from '../auth/user-token.js';
+import { RuntimeMetrics } from '../metrics/index.js';
 import { RuntimePaths } from '../runtime/paths.js';
 import { RecoveryScanner } from '../runtime/recovery.js';
 import { AckSweeper, SseRegistry } from '../runtime/sse/index.js';
 import { TaskIndex } from '../runtime/task-index.js';
 import { DedupeReaper } from '../runtime/dedupe-reaper.js';
+import { SkillRegistry } from '../skills/registry.js';
 
 import { registerHealthRoutes } from './routes/health.js';
 import { registerUserRoutes } from './routes/users.js';
@@ -88,6 +92,33 @@ export async function createServer(cfg: ServerConfig): Promise<ServerHandle> {
   const tokenIndex = parseLocalUserTokens(cfg.localUserTokens);
   const auth = new TokenAuthService(tokenIndex, rt.users);
 
+  // Skill registry — load from skills/public + skills/custom with cache fallback.
+  const metrics = new RuntimeMetrics();
+  const diagnosticsLog = path.join(rt.paths.diagnosticsRoot(), 'skills.jsonl');
+  await fs.mkdir(rt.paths.diagnosticsRoot(), { recursive: true });
+  const skillRegistry = new SkillRegistry(
+    path.join(rt.paths.diagnosticsRoot(), 'skills-cache.json'),
+    {
+      onLoadError: (err) => {
+        try {
+          metrics.skillsLoadErrorTotal.inc({ errorClass: err.errorClass });
+        } catch {
+          /* best-effort */
+        }
+        void fs.appendFile(diagnosticsLog, JSON.stringify(err) + '\n').catch(() => {});
+      },
+      onFallback: (ev) => {
+        try {
+          metrics.skillsFallbackToCacheTotal.inc({ skillName: ev.skillName });
+        } catch {
+          /* best-effort */
+        }
+        void fs.appendFile(diagnosticsLog, JSON.stringify(ev) + '\n').catch(() => {});
+      },
+    },
+  );
+  await skillRegistry.load([rt.paths.skillsPublicRoot, rt.paths.skillsCustomRoot]);
+
   const app = Fastify({
     logger: {
       level: process.env['LOG_LEVEL'] ?? 'info',
@@ -133,7 +164,7 @@ export async function createServer(cfg: ServerConfig): Promise<ServerHandle> {
   registerArtifactRoutes(app, { rt });
   registerChannelRoutes(app, { rt });
   registerPolicyRoutes(app, { rt });
-  registerSkillRoutes(app, { rt });
+  registerSkillRoutes(app, { rt, registry: skillRegistry });
   registerTeamRoutes(app, { rt, taskIndex });
 
   const ackSweeper = new AckSweeper({ sse, intervalMs: 10_000 });
