@@ -6,6 +6,13 @@ import { API_ROUTES } from '@ai-workflow/contracts';
 import type {
   ChannelBindingListResponse,
   PolicyListResponse,
+  PlanListResponse,
+  RetryHistoryResponse,
+  TaskActionResponse,
+  TeamListResponse,
+  TeamMessagesResponse,
+  TeamWorkItemsResponse,
+  TeammatesResponse,
   ThreadListResponse,
   ThreadDto,
 } from '@ai-workflow/contracts';
@@ -45,6 +52,24 @@ export const api = {
     post<{ thread: ThreadDto }>(API_ROUTES.threads.create, body),
   postMessage: (threadId: string, text: string) =>
     post(API_ROUTES.threads.postMessage(threadId), { text }),
+
+  getTask: (taskId: string) => get<TaskActionResponse>(API_ROUTES.tasks.get(taskId)),
+  confirmTask: (taskId: string) => post<TaskActionResponse>(API_ROUTES.tasks.confirm(taskId)),
+  cancelTask: (taskId: string) => post<TaskActionResponse>(API_ROUTES.tasks.cancel(taskId)),
+  pauseTask: (taskId: string) => post<TaskActionResponse>(API_ROUTES.tasks.pause(taskId)),
+  resumeTask: (taskId: string) => post<TaskActionResponse>(API_ROUTES.tasks.resume(taskId)),
+  retryTask: (taskId: string) => post<TaskActionResponse>(API_ROUTES.tasks.retry(taskId)),
+  retryHistory: (taskId: string) => get<RetryHistoryResponse>(API_ROUTES.tasks.retryHistory(taskId)),
+  taskPlans: (taskId: string) => get<PlanListResponse>(API_ROUTES.tasks.plans(taskId)),
+
+  listTeams: (taskId: string) => get<TeamListResponse>(API_ROUTES.teams.listForTask(taskId)),
+  teamWorkItems: (taskId: string, teamId: string) =>
+    get<TeamWorkItemsResponse>(API_ROUTES.teams.workItems(taskId, teamId)),
+  teamMessages: (taskId: string, teamId: string) =>
+    get<TeamMessagesResponse>(API_ROUTES.teams.messages(taskId, teamId)),
+  teammates: (taskId: string, teamId: string) =>
+    get<TeammatesResponse>(API_ROUTES.teams.teammates(taskId, teamId)),
+
   listPolicies: () => get<PolicyListResponse>(API_ROUTES.criticalNodePolicies.list),
   listChannelBindings: () =>
     get<ChannelBindingListResponse>(API_ROUTES.channels.listBindings),
