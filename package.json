@@ -10,7 +10,7 @@
     "test": "pnpm -r test",
     "test:e2e": "pnpm --filter @ai-workflow/bot-runtime test:e2e && pnpm --filter @ai-workflow/web test:e2e",
     "test:evals": "pnpm --filter @ai-workflow/bot-runtime test:evals",
-    "verify": "pnpm lint && pnpm -r build && pnpm -r test"
+    "verify": "pnpm lint && pnpm -r build && pnpm -r test && pnpm test:evals"
   },
   "engines": {
     "node": ">=22.0.0",

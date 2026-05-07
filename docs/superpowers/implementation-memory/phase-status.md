@@ -24,11 +24,9 @@ Modules:
 
 ## Phase Index
 
-- [x] Phase 0–8 above
-- [x] Phase 9: Agent Teams Runtime
-- [x] Phase 10: Web Client Product Surface
-- [ ] Phase 11: Observability, Sanitization, Ops, Docs
-- [ ] Phase 12: E2E, Agent Evals, CI, Final Acceptance
+- [x] Phase 0–10 above
+- [x] Phase 11: Observability, Sanitization, Ops, Docs
+- [x] Phase 12: E2E, Agent Evals, CI, Final Acceptance
 
 ## Notes
 
