@@ -1,0 +1,40 @@
+{"id":"to-0-0","input":{"description":"tiny read-file edit"},"label":"direct"}
+{"id":"to-0-1","input":{"description":"answer a factoid"},"label":"direct"}
+{"id":"to-0-2","input":{"description":"single str_replace fix"},"label":"direct"}
+{"id":"to-0-3","input":{"description":"one-off write_file"},"label":"direct"}
+{"id":"to-0-4","input":{"description":"kick off a quick research spike"},"label":"subagent"}
+{"id":"to-0-5","input":{"description":"crawl a website for data"},"label":"subagent"}
+{"id":"to-0-6","input":{"description":"fuzz a specific function"},"label":"subagent"}
+{"id":"to-0-7","input":{"description":"build feature with researcher + coder-1 + reviewer"},"label":"team"}
+{"id":"to-0-8","input":{"description":"parallelize data collection with 4 workers"},"label":"team"}
+{"id":"to-0-9","input":{"description":"author + editor + fact-checker pipeline"},"label":"team"}
+{"id":"to-1-0","input":{"description":"tiny read-file edit"},"label":"direct"}
+{"id":"to-1-1","input":{"description":"answer a factoid"},"label":"direct"}
+{"id":"to-1-2","input":{"description":"single str_replace fix"},"label":"direct"}
+{"id":"to-1-3","input":{"description":"one-off write_file"},"label":"direct"}
+{"id":"to-1-4","input":{"description":"kick off a quick research spike"},"label":"subagent"}
+{"id":"to-1-5","input":{"description":"crawl a website for data"},"label":"subagent"}
+{"id":"to-1-6","input":{"description":"fuzz a specific function"},"label":"subagent"}
+{"id":"to-1-7","input":{"description":"build feature with researcher + coder-1 + reviewer"},"label":"team"}
+{"id":"to-1-8","input":{"description":"parallelize data collection with 4 workers"},"label":"team"}
+{"id":"to-1-9","input":{"description":"author + editor + fact-checker pipeline"},"label":"team"}
+{"id":"to-2-0","input":{"description":"tiny read-file edit"},"label":"direct"}
+{"id":"to-2-1","input":{"description":"answer a factoid"},"label":"direct"}
+{"id":"to-2-2","input":{"description":"single str_replace fix"},"label":"direct"}
+{"id":"to-2-3","input":{"description":"one-off write_file"},"label":"direct"}
+{"id":"to-2-4","input":{"description":"kick off a quick research spike"},"label":"subagent"}
+{"id":"to-2-5","input":{"description":"crawl a website for data"},"label":"subagent"}
+{"id":"to-2-6","input":{"description":"fuzz a specific function"},"label":"subagent"}
+{"id":"to-2-7","input":{"description":"build feature with researcher + coder-1 + reviewer"},"label":"team"}
+{"id":"to-2-8","input":{"description":"parallelize data collection with 4 workers"},"label":"team"}
+{"id":"to-2-9","input":{"description":"author + editor + fact-checker pipeline"},"label":"team"}
+{"id":"to-3-0","input":{"description":"tiny read-file edit"},"label":"direct"}
+{"id":"to-3-1","input":{"description":"answer a factoid"},"label":"direct"}
+{"id":"to-3-2","input":{"description":"single str_replace fix"},"label":"direct"}
+{"id":"to-3-3","input":{"description":"one-off write_file"},"label":"direct"}
+{"id":"to-3-4","input":{"description":"kick off a quick research spike"},"label":"subagent"}
+{"id":"to-3-5","input":{"description":"crawl a website for data"},"label":"subagent"}
+{"id":"to-3-6","input":{"description":"fuzz a specific function"},"label":"subagent"}
+{"id":"to-3-7","input":{"description":"build feature with researcher + coder-1 + reviewer"},"label":"team"}
+{"id":"to-3-8","input":{"description":"parallelize data collection with 4 workers"},"label":"team"}
+{"id":"to-3-9","input":{"description":"author + editor + fact-checker pipeline"},"label":"team"}

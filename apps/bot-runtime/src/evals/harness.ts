@@ -3,8 +3,12 @@
  * `tests/evals/datasets/`, runs a per-row classifier, and reports
  * accuracy / F1 against thresholds. Vitest test files in `tests/evals` /
  * `apps/bot-runtime/src/evals/__tests__/` consume these helpers.
+ *
+ * `persistResult` writes a `tests/evals/results/<YYYY-MM-DD>/<name>.json`
+ * snapshot so runs are auditable per the v1 §10.1 #50/#67 acceptance items.
  */
-import { readFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
 
 export interface EvalRow<TInput = unknown, TLabel = string> {
   id: string;
@@ -79,4 +83,15 @@ export function scoreClassification<T extends EvalRow<unknown, string>>(
     microF1,
     perLabel,
   };
+}
+
+const RESULTS_ROOT = path.resolve(process.cwd(), '../../tests/evals/results');
+
+export function persistResult(name: string, result: EvalResult): string {
+  const day = new Date().toISOString().slice(0, 10);
+  const dir = path.join(RESULTS_ROOT, day);
+  mkdirSync(dir, { recursive: true });
+  const file = path.join(dir, `${name}.json`);
+  writeFileSync(file, JSON.stringify({ at: new Date().toISOString(), result }, null, 2));
+  return file;
 }

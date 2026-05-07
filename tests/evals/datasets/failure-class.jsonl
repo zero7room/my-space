@@ -1,0 +1,42 @@
+{"id":"fc-0-0","input":{"message":"ETIMEDOUT upstream socket"},"label":"transient_error"}
+{"id":"fc-0-1","input":{"message":"ECONNRESET reading response"},"label":"transient_error"}
+{"id":"fc-0-2","input":{"message":"503 Service Unavailable"},"label":"transient_error"}
+{"id":"fc-0-3","input":{"message":"504 Gateway Timeout"},"label":"transient_error"}
+{"id":"fc-0-4","input":{"message":"EAI_AGAIN dns lookup"},"label":"transient_error"}
+{"id":"fc-0-5","input":{"message":"connection reset by peer"},"label":"transient_error"}
+{"id":"fc-0-6","input":{"message":"assertion failed: expected 3 got 2"},"label":"assertion_error"}
+{"id":"fc-0-7","input":{"message":"test expectation mismatch"},"label":"assertion_error"}
+{"id":"fc-0-8","input":{"message":"invariant violated: state missing"},"label":"assertion_error"}
+{"id":"fc-0-9","input":{"message":"permission denied writing file"},"label":"permission_error"}
+{"id":"fc-0-10","input":{"message":"forbidden: not owner"},"label":"permission_error"}
+{"id":"fc-0-11","input":{"message":"access denied to /etc/passwd"},"label":"permission_error"}
+{"id":"fc-0-12","input":{"message":"permission_error: tool tried to escape root"},"label":"permission_error"}
+{"id":"fc-0-13","input":{"message":"user cancelled by signal"},"label":"user_cancelled"}
+{"id":"fc-1-0","input":{"message":"ETIMEDOUT upstream socket"},"label":"transient_error"}
+{"id":"fc-1-1","input":{"message":"ECONNRESET reading response"},"label":"transient_error"}
+{"id":"fc-1-2","input":{"message":"503 Service Unavailable"},"label":"transient_error"}
+{"id":"fc-1-3","input":{"message":"504 Gateway Timeout"},"label":"transient_error"}
+{"id":"fc-1-4","input":{"message":"EAI_AGAIN dns lookup"},"label":"transient_error"}
+{"id":"fc-1-5","input":{"message":"connection reset by peer"},"label":"transient_error"}
+{"id":"fc-1-6","input":{"message":"assertion failed: expected 3 got 2"},"label":"assertion_error"}
+{"id":"fc-1-7","input":{"message":"test expectation mismatch"},"label":"assertion_error"}
+{"id":"fc-1-8","input":{"message":"invariant violated: state missing"},"label":"assertion_error"}
+{"id":"fc-1-9","input":{"message":"permission denied writing file"},"label":"permission_error"}
+{"id":"fc-1-10","input":{"message":"forbidden: not owner"},"label":"permission_error"}
+{"id":"fc-1-11","input":{"message":"access denied to /etc/passwd"},"label":"permission_error"}
+{"id":"fc-1-12","input":{"message":"permission_error: tool tried to escape root"},"label":"permission_error"}
+{"id":"fc-1-13","input":{"message":"user cancelled by signal"},"label":"user_cancelled"}
+{"id":"fc-2-0","input":{"message":"ETIMEDOUT upstream socket"},"label":"transient_error"}
+{"id":"fc-2-1","input":{"message":"ECONNRESET reading response"},"label":"transient_error"}
+{"id":"fc-2-2","input":{"message":"503 Service Unavailable"},"label":"transient_error"}
+{"id":"fc-2-3","input":{"message":"504 Gateway Timeout"},"label":"transient_error"}
+{"id":"fc-2-4","input":{"message":"EAI_AGAIN dns lookup"},"label":"transient_error"}
+{"id":"fc-2-5","input":{"message":"connection reset by peer"},"label":"transient_error"}
+{"id":"fc-2-6","input":{"message":"assertion failed: expected 3 got 2"},"label":"assertion_error"}
+{"id":"fc-2-7","input":{"message":"test expectation mismatch"},"label":"assertion_error"}
+{"id":"fc-2-8","input":{"message":"invariant violated: state missing"},"label":"assertion_error"}
+{"id":"fc-2-9","input":{"message":"permission denied writing file"},"label":"permission_error"}
+{"id":"fc-2-10","input":{"message":"forbidden: not owner"},"label":"permission_error"}
+{"id":"fc-2-11","input":{"message":"access denied to /etc/passwd"},"label":"permission_error"}
+{"id":"fc-2-12","input":{"message":"permission_error: tool tried to escape root"},"label":"permission_error"}
+{"id":"fc-2-13","input":{"message":"user cancelled by signal"},"label":"user_cancelled"}

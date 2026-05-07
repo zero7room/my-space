@@ -1,0 +1,53 @@
+{
+  "at": "2026-05-07T03:32:15.750Z",
+  "result": {
+    "total": 30,
+    "correct": 30,
+    "accuracy": 1,
+    "microF1": 1,
+    "perLabel": {
+      "confirm_task": {
+        "tp": 2,
+        "fp": 0,
+        "fn": 0,
+        "f1": 1
+      },
+      "cancel_task": {
+        "tp": 1,
+        "fp": 0,
+        "fn": 0,
+        "f1": 1
+      },
+      "pause_task": {
+        "tp": 1,
+        "fp": 0,
+        "fn": 0,
+        "f1": 1
+      },
+      "resume_task": {
+        "tp": 1,
+        "fp": 0,
+        "fn": 0,
+        "f1": 1
+      },
+      "progress_query": {
+        "tp": 1,
+        "fp": 0,
+        "fn": 0,
+        "f1": 1
+      },
+      "chat": {
+        "tp": 13,
+        "fp": 0,
+        "fn": 0,
+        "f1": 1
+      },
+      "irrelevant": {
+        "tp": 11,
+        "fp": 0,
+        "fn": 0,
+        "f1": 1
+      }
+    }
+  }
+}

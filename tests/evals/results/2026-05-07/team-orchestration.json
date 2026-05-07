@@ -1,0 +1,29 @@
+{
+  "at": "2026-05-07T03:32:15.663Z",
+  "result": {
+    "total": 40,
+    "correct": 40,
+    "accuracy": 1,
+    "microF1": 1,
+    "perLabel": {
+      "direct": {
+        "tp": 16,
+        "fp": 0,
+        "fn": 0,
+        "f1": 1
+      },
+      "subagent": {
+        "tp": 12,
+        "fp": 0,
+        "fn": 0,
+        "f1": 1
+      },
+      "team": {
+        "tp": 12,
+        "fp": 0,
+        "fn": 0,
+        "f1": 1
+      }
+    }
+  }
+}

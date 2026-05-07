@@ -1,0 +1,29 @@
+{
+  "at": "2026-05-07T03:32:15.752Z",
+  "result": {
+    "total": 42,
+    "correct": 36,
+    "accuracy": 0.8571428571428571,
+    "microF1": 0.8571428571428571,
+    "perLabel": {
+      "transient_error": {
+        "tp": 12,
+        "fp": 0,
+        "fn": 6,
+        "f1": 0.8
+      },
+      "assertion_error": {
+        "tp": 12,
+        "fp": 6,
+        "fn": 0,
+        "f1": 0.8
+      },
+      "permission_error": {
+        "tp": 12,
+        "fp": 0,
+        "fn": 0,
+        "f1": 1
+      }
+    }
+  }
+}

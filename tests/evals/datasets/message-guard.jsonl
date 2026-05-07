@@ -1,10 +1,30 @@
-{"id":"mg-1","input":{"text":"please draft a Q3 marketing plan","source":"client","bound":true,"isOwner":true,"hasPendingConfirmation":false},"label":"chat"}
-{"id":"mg-2","input":{"text":"/confirm","source":"client","bound":true,"isOwner":true,"hasPendingConfirmation":true},"label":"confirm_task"}
-{"id":"mg-3","input":{"text":"/cancel","source":"client","bound":true,"isOwner":true,"hasPendingConfirmation":false},"label":"cancel_task"}
-{"id":"mg-4","input":{"text":"/pause","source":"client","bound":true,"isOwner":true,"hasPendingConfirmation":false},"label":"pause_task"}
-{"id":"mg-5","input":{"text":"/resume","source":"client","bound":true,"isOwner":true,"hasPendingConfirmation":false},"label":"resume_task"}
-{"id":"mg-6","input":{"text":"/status","source":"client","bound":true,"isOwner":true,"hasPendingConfirmation":false},"label":"progress_query"}
-{"id":"mg-7","input":{"text":"team standup at 11","source":"lark_group","bound":false,"isOwner":false,"hasPendingConfirmation":false},"label":"irrelevant"}
-{"id":"mg-8","input":{"text":"random group chatter","source":"lark_group","bound":true,"isOwner":false,"hasPendingConfirmation":false},"label":"irrelevant"}
-{"id":"mg-9","input":{"text":"@bot please update plan","source":"lark_group","bound":true,"isOwner":true,"hasPendingConfirmation":false,"mentionedBot":true},"label":"chat"}
-{"id":"mg-10","input":{"text":"@bot bind this thread","source":"lark_group","bound":false,"isOwner":true,"hasPendingConfirmation":false},"label":"chat"}
+{"id":"mg-slash-/confirm","input":{"source":"client","bound":true,"isOwner":true,"hasPendingConfirmation":true,"text":"/confirm"},"label":"confirm_task"}
+{"id":"mg-slash-/yes","input":{"source":"client","bound":true,"isOwner":true,"hasPendingConfirmation":true,"text":"/yes"},"label":"confirm_task"}
+{"id":"mg-slash-/cancel","input":{"source":"client","bound":true,"isOwner":true,"hasPendingConfirmation":false,"text":"/cancel"},"label":"cancel_task"}
+{"id":"mg-slash-/pause","input":{"source":"client","bound":true,"isOwner":true,"hasPendingConfirmation":false,"text":"/pause"},"label":"pause_task"}
+{"id":"mg-slash-/resume","input":{"source":"client","bound":true,"isOwner":true,"hasPendingConfirmation":false,"text":"/resume"},"label":"resume_task"}
+{"id":"mg-slash-/status","input":{"source":"client","bound":true,"isOwner":true,"hasPendingConfirmation":false,"text":"/status"},"label":"progress_query"}
+{"id":"mg-chat-0","input":{"source":"client","bound":true,"isOwner":true,"hasPendingConfirmation":false,"text":"draft a Q3 marketing plan"},"label":"chat"}
+{"id":"mg-chat-1","input":{"source":"client","bound":true,"isOwner":true,"hasPendingConfirmation":false,"text":"help me brainstorm a launch"},"label":"chat"}
+{"id":"mg-chat-2","input":{"source":"client","bound":true,"isOwner":true,"hasPendingConfirmation":false,"text":"let us discuss the roadmap"},"label":"chat"}
+{"id":"mg-chat-3","input":{"source":"client","bound":true,"isOwner":true,"hasPendingConfirmation":false,"text":"what is our strategy here"},"label":"chat"}
+{"id":"mg-chat-4","input":{"source":"client","bound":true,"isOwner":true,"hasPendingConfirmation":false,"text":"please summarize the meeting"},"label":"chat"}
+{"id":"mg-chat-5","input":{"source":"client","bound":true,"isOwner":true,"hasPendingConfirmation":false,"text":"share the latest notes"},"label":"chat"}
+{"id":"mg-chat-6","input":{"source":"client","bound":true,"isOwner":true,"hasPendingConfirmation":false,"text":"quick thought on the brief"},"label":"chat"}
+{"id":"mg-chat-7","input":{"source":"client","bound":true,"isOwner":true,"hasPendingConfirmation":false,"text":"thanks for the context"},"label":"chat"}
+{"id":"mg-chat-8","input":{"source":"client","bound":true,"isOwner":true,"hasPendingConfirmation":false,"text":"good morning"},"label":"chat"}
+{"id":"mg-chat-9","input":{"source":"client","bound":true,"isOwner":true,"hasPendingConfirmation":false,"text":"ping when ready"},"label":"chat"}
+{"id":"mg-irrelevant-0","input":{"source":"lark_group","bound":false,"isOwner":false,"hasPendingConfirmation":false,"text":"standup at 11"},"label":"irrelevant"}
+{"id":"mg-irrelevant-1","input":{"source":"lark_group","bound":false,"isOwner":false,"hasPendingConfirmation":false,"text":"pizza friday"},"label":"irrelevant"}
+{"id":"mg-irrelevant-2","input":{"source":"lark_group","bound":false,"isOwner":false,"hasPendingConfirmation":false,"text":"team lunch tomorrow"},"label":"irrelevant"}
+{"id":"mg-irrelevant-3","input":{"source":"lark_group","bound":false,"isOwner":false,"hasPendingConfirmation":false,"text":"random group chatter"},"label":"irrelevant"}
+{"id":"mg-irrelevant-4","input":{"source":"lark_group","bound":false,"isOwner":false,"hasPendingConfirmation":false,"text":"anyone seen the keys"},"label":"irrelevant"}
+{"id":"mg-irrelevant-5","input":{"source":"lark_group","bound":false,"isOwner":false,"hasPendingConfirmation":false,"text":"project alpha recap"},"label":"irrelevant"}
+{"id":"mg-irrelevant-6","input":{"source":"lark_group","bound":false,"isOwner":false,"hasPendingConfirmation":false,"text":"sprint demo at 3"},"label":"irrelevant"}
+{"id":"mg-irrelevant-7","input":{"source":"lark_group","bound":false,"isOwner":false,"hasPendingConfirmation":false,"text":"share of voice update"},"label":"irrelevant"}
+{"id":"mg-bound-ignored-0","input":{"source":"lark_group","bound":true,"isOwner":false,"hasPendingConfirmation":false,"text":"fyi team — no bot here"},"label":"irrelevant"}
+{"id":"mg-bound-ignored-1","input":{"source":"lark_group","bound":true,"isOwner":false,"hasPendingConfirmation":false,"text":"just chatting among humans"},"label":"irrelevant"}
+{"id":"mg-bound-ignored-2","input":{"source":"lark_group","bound":true,"isOwner":false,"hasPendingConfirmation":false,"text":"ok see you later"},"label":"irrelevant"}
+{"id":"mg-mention-0","input":{"source":"lark_group","bound":true,"isOwner":true,"hasPendingConfirmation":false,"text":"@bot update the plan","mentionedBot":true},"label":"chat"}
+{"id":"mg-mention-1","input":{"source":"lark_group","bound":true,"isOwner":true,"hasPendingConfirmation":false,"text":"@bot please run the report","mentionedBot":true},"label":"chat"}
+{"id":"mg-mention-2","input":{"source":"lark_group","bound":true,"isOwner":true,"hasPendingConfirmation":false,"text":"@bot schedule the job","mentionedBot":true},"label":"chat"}

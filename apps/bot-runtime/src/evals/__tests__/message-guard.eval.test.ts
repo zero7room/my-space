@@ -9,7 +9,7 @@ import { describe, it, expect } from 'vitest';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { loadJsonlDataset, scoreClassification } from '../harness.js';
+import { loadJsonlDataset, persistResult, scoreClassification } from '../harness.js';
 import { MessageGuard, type GuardInput } from '../../thread-loop/message-guard.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -35,8 +35,7 @@ describe('MessageGuard eval', () => {
       preds.push(d.intent);
     }
     const result = scoreClassification(rows, preds);
-    // Bundle is 10 rows; LLM-bound rows fall through to "chat".
-    // Accept >= 0.6 here; full eval (200 rows) targets 0.9 / micro-F1 0.85.
-    expect(result.accuracy).toBeGreaterThanOrEqual(0.6);
+    // 30-row labeled set; rule classifier alone reaches ≥ 0.85.
+    persistResult('message-guard', result); expect(result.accuracy).toBeGreaterThanOrEqual(0.85);
   });
 });
