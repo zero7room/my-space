@@ -3,13 +3,14 @@ import * as React from 'react';
 import { cn } from '../../lib/cn';
 import { useTasksStore } from '../../lib/stores/tasks';
 
-type TabId = 'summary' | 'plan' | 'changes' | 'log' | 'team' | 'artifact';
+type TabId = 'summary' | 'plan' | 'changes' | 'log' | 'retry' | 'team' | 'artifact';
 
 const TABS: ReadonlyArray<{ id: TabId; label: string }> = [
   { id: 'summary', label: '摘要' },
   { id: 'plan', label: '计划' },
   { id: 'changes', label: '变更' },
   { id: 'log', label: '日志' },
+  { id: 'retry', label: '重试历史' },
   { id: 'team', label: '团队' },
   { id: 'artifact', label: '产物' },
 ];

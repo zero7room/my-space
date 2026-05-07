@@ -117,6 +117,10 @@ export function WorkbenchPage(props: Props = {}): React.JSX.Element {
   const setBlocked = useTasksStore((s) => s.setBlocked);
   const markArtifactDrifted = useTasksStore((s) => s.markArtifactDrifted);
   const appendTaskEvent = useSseStore((s) => s.appendTaskEvent);
+  const appendMessage = useSseStore((s) => s.appendMessage);
+  const attachGuardDecisionToLastUser = useSseStore(
+    (s) => s.attachGuardDecisionToLastUser,
+  );
 
   const [criticalNodeHit, setCriticalNodeHit] =
     React.useState<CriticalNodeHit | null>(null);
@@ -127,6 +131,17 @@ export function WorkbenchPage(props: Props = {}): React.JSX.Element {
     React.useState<ChangeConfirmState | null>(null);
   const [feishuOpen, setFeishuOpen] = React.useState(false);
   const [channelsDrawerOpen, setChannelsDrawerOpen] = React.useState(false);
+
+  // Dedupe modal opens by revisionId — both during replay and across reopens.
+  const openedRevisionsRef = React.useRef<Set<string>>(new Set());
+  const planConfirmRef = React.useRef<PlanConfirmState | null>(null);
+  const changeConfirmRef = React.useRef<ChangeConfirmState | null>(null);
+  React.useEffect(() => {
+    planConfirmRef.current = planConfirm;
+  }, [planConfirm]);
+  React.useEffect(() => {
+    changeConfirmRef.current = changeConfirm;
+  }, [changeConfirm]);
 
   // Initial deep-links / selection wiring
   const initRanRef = React.useRef(false);
@@ -166,6 +181,7 @@ export function WorkbenchPage(props: Props = {}): React.JSX.Element {
       const kind = ev.kind as string;
       const payload = (ev.payload ?? {}) as Record<string, unknown>;
       const taskId = toStr(ev.taskId) || toStr(payload['taskId']);
+      const threadId = toStr(ev.threadId) || toStr(payload['threadId']) || activeId || '';
 
       if (taskId) {
         appendTaskEvent(taskId, {
@@ -175,6 +191,54 @@ export function WorkbenchPage(props: Props = {}): React.JSX.Element {
           payload: ev.payload,
           seq: ev.seq,
         });
+      }
+
+      // Chat messages — dispatched into the centralized store so ChatWindow
+      // can subscribe rather than running its own SSE client.
+      if (kind === 'message_appended' || kind === 'team_message_appended') {
+        if (!threadId) return;
+        const role = (() => {
+          const r = payload['role'];
+          return r === 'user' || r === 'assistant' || r === 'system' ? r : 'assistant';
+        })();
+        const text =
+          toStr(payload['text']) ||
+          toStr(payload['content']) ||
+          toStr(payload['body']);
+        if (!text) return;
+        const id =
+          toStr(payload['messageId']) ||
+          toStr(payload['id']) ||
+          (typeof ev.id === 'string' || typeof ev.id === 'number'
+            ? String(ev.id)
+            : `${ev.seq ?? Date.now()}`);
+        const at = toStr(payload['at']) || ev.at || new Date().toISOString();
+        appendMessage(threadId, { id, role, text, at });
+        return;
+      }
+
+      if (kind === 'guard_decision_recorded') {
+        if (!threadId) return;
+        const intent = payload['intent'];
+        if (typeof intent !== 'string') return;
+        const shortCircuited =
+          payload['shortCircuited'] === true || payload['short_circuited'] === true;
+        const conf = payload['confidence'];
+        const confidence = typeof conf === 'number' ? conf : 0;
+        const rulesRaw = payload['ruleHits'] ?? payload['rule_hits'];
+        const ruleHits = Array.isArray(rulesRaw)
+          ? rulesRaw.filter((x): x is string => typeof x === 'string')
+          : undefined;
+        const reason =
+          typeof payload['reason'] === 'string' ? payload['reason'] : undefined;
+        attachGuardDecisionToLastUser(threadId, {
+          intent,
+          shortCircuited,
+          confidence,
+          ruleHits,
+          reason,
+        });
+        return;
       }
 
       switch (kind) {
@@ -202,6 +266,10 @@ export function WorkbenchPage(props: Props = {}): React.JSX.Element {
           if (payload['autoConfirm'] === true) return;
           const revisionId = toStr(payload['revisionId']);
           if (!taskId || !revisionId) return;
+          // Dedupe — never reopen for a revisionId we already showed.
+          if (openedRevisionsRef.current.has(revisionId)) return;
+          if (planConfirmRef.current?.revisionId === revisionId) return;
+          openedRevisionsRef.current.add(revisionId);
           void api
             .getPlanRevision(taskId, revisionId)
             .then((res) => {
@@ -216,6 +284,9 @@ export function WorkbenchPage(props: Props = {}): React.JSX.Element {
           const newRev = toStr(payload['newRevisionId']) || toStr(payload['revisionId']);
           const oldRev = toStr(payload['oldRevisionId']) || null;
           if (!taskId || !newRev) return;
+          if (openedRevisionsRef.current.has(newRev)) return;
+          if (changeConfirmRef.current?.newRevisionId === newRev) return;
+          openedRevisionsRef.current.add(newRev);
           const archivedRaw = payload['archivedArtifactIds'];
           const archivedArtifactCount = Array.isArray(archivedRaw)
             ? archivedRaw.length
@@ -267,7 +338,14 @@ export function WorkbenchPage(props: Props = {}): React.JSX.Element {
           return;
       }
     },
-    [appendTaskEvent, markArtifactDrifted, setBlocked],
+    [
+      activeId,
+      appendTaskEvent,
+      appendMessage,
+      attachGuardDecisionToLastUser,
+      markArtifactDrifted,
+      setBlocked,
+    ],
   );
 
   // Wire a top-level SSE client mirroring ChatWindow's stream so modal/log

@@ -1,6 +1,7 @@
 'use client';
 import * as React from 'react';
 import { cn } from '../../lib/cn';
+import { useConversationsStore } from '../../lib/stores/conversations';
 import { useTasksStore } from '../../lib/stores/tasks';
 import { DegradedBanner } from './DegradedBanner';
 
@@ -16,12 +17,13 @@ export function WorkbenchShell({
   children: React.ReactNode;
 }): React.JSX.Element {
   const drawerOpen = useTasksStore((s) => s.drawerOpen);
+  const sidebarCollapsed = useConversationsStore((s) => s.sidebarCollapsed);
   return (
     <div className="flex h-dvh min-w-0 text-foreground">
       <aside
         className={cn(
           'flex h-full flex-col border-r border-border bg-[rgba(255,250,243,0.72)] backdrop-blur transition-[width] duration-200',
-          drawerOpen ? 'w-20' : 'w-64',
+          sidebarCollapsed ? 'w-20' : 'w-64',
         )}
       >
         {sidebar}

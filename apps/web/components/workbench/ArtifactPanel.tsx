@@ -42,6 +42,7 @@ export function ArtifactPanel(props: { taskId: string }): React.JSX.Element {
     Record<string, unknown>
   >({});
   const drifted = useTasksStore((s) => s.driftedArtifacts);
+  const clearArtifactDrift = useTasksStore((s) => s.clearArtifactDrift);
 
   const refresh = React.useCallback(async () => {
     setErr(null);
@@ -50,11 +51,11 @@ export function ArtifactPanel(props: { taskId: string }): React.JSX.Element {
       const taskRaw = res.task as unknown as Record<string, unknown>;
       const inline = taskRaw['artifacts'];
       if (Array.isArray(inline)) {
-        setItems(
-          inline
-            .map((a) => normalizeArtifact(a))
-            .filter((a): a is ArtifactLike => a !== null),
-        );
+        const list = inline
+          .map((a) => normalizeArtifact(a))
+          .filter((a): a is ArtifactLike => a !== null)
+          .filter((a) => (a.relativePath ?? '').startsWith('outputs/'));
+        setItems(list);
         return;
       }
       const ids = Array.isArray(taskRaw['artifactIds'])
@@ -71,15 +72,19 @@ export function ArtifactPanel(props: { taskId: string }): React.JSX.Element {
           try {
             const r = await api.getArtifact(id);
             const rec =
-              (r as Record<string, unknown> | null)?.['artifact'] ??
-              (r as Record<string, unknown>);
+              (r as unknown as Record<string, unknown> | null)?.['artifact'] ??
+              (r as unknown as Record<string, unknown>);
             return normalizeArtifact(rec);
           } catch {
             return null;
           }
         }),
       );
-      setItems(fetched.filter((a): a is ArtifactLike => a !== null));
+      setItems(
+        fetched
+          .filter((a): a is ArtifactLike => a !== null)
+          .filter((a) => (a.relativePath ?? '').startsWith('outputs/')),
+      );
     } catch (e) {
       setErr((e as Error).message);
       setItems([]);
@@ -95,6 +100,7 @@ export function ArtifactPanel(props: { taskId: string }): React.JSX.Element {
     setBusy(id);
     try {
       await api.resealArtifact(id);
+      clearArtifactDrift(id);
       await refresh();
     } catch (e) {
       setErr((e as Error).message);

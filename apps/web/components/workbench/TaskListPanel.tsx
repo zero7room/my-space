@@ -4,6 +4,7 @@ import type { ThreadDto, ThreadListResponse } from '@ai-workflow/contracts';
 import { api } from '../../lib/api-client';
 import { cn } from '../../lib/cn';
 import { useTasksStore } from '../../lib/stores/tasks';
+import { useSseStore } from '../../lib/stores/sse';
 import { PlanProgressSection } from './PlanProgressSection';
 
 type TaskRef = {
@@ -139,6 +140,7 @@ export function TaskListPanel(props: {
 }): React.JSX.Element {
   const { threadId } = props;
   const setSelected = useTasksStore((s) => s.setSelected);
+  const paused = useSseStore((s) => s.replaying || s.reloadRequired);
   const [refs, setRefs] = React.useState<TaskRef[]>([]);
   const [activeTaskId, setActiveTaskId] = React.useState<string | null>(null);
   const [loaded, setLoaded] = React.useState(false);
@@ -174,6 +176,11 @@ export function TaskListPanel(props: {
       }
     }
     void pull();
+    if (paused) {
+      return () => {
+        cancelled = true;
+      };
+    }
     const iv = setInterval(() => {
       void pull();
     }, 3000);
@@ -181,7 +188,7 @@ export function TaskListPanel(props: {
       cancelled = true;
       clearInterval(iv);
     };
-  }, [threadId]);
+  }, [threadId, paused]);
 
   const { active, terminal } = React.useMemo(() => {
     const a: TaskRef[] = [];

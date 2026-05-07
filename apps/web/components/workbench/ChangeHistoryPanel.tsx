@@ -1,7 +1,7 @@
 'use client';
 import * as React from 'react';
 import type { PlanListResponse } from '@ai-workflow/contracts';
-import { api } from '../../lib/api-client';
+import { api, type ChangeRecordEntry } from '../../lib/api-client';
 import { cn } from '../../lib/cn';
 
 const REVISION_PILL: Record<string, string> = {
@@ -59,11 +59,13 @@ export function ChangeHistoryPanel(props: {
   const [err, setErr] = React.useState<string | null>(null);
   const [openId, setOpenId] = React.useState<string | null>(null);
   const [preview, setPreview] = React.useState<Record<string, unknown>>({});
+  const [changeRecords, setChangeRecords] = React.useState<ChangeRecordEntry[]>([]);
 
   React.useEffect(() => {
     let cancelled = false;
     setErr(null);
     setData(null);
+    setChangeRecords([]);
     api
       .taskPlans(taskId)
       .then((r) => {
@@ -71,6 +73,14 @@ export function ChangeHistoryPanel(props: {
       })
       .catch((e: unknown) => {
         if (!cancelled) setErr((e as Error).message);
+      });
+    api
+      .changeRecords(taskId)
+      .then((r) => {
+        if (!cancelled) setChangeRecords(r.entries);
+      })
+      .catch(() => {
+        /* best effort — endpoint may not exist yet */
       });
     return () => {
       cancelled = true;
@@ -113,6 +123,39 @@ export function ChangeHistoryPanel(props: {
   return (
     <section className="flex flex-col gap-4 p-4">
       <div className="u-label">变更历史</div>
+
+      {/* ChangeRecord summary block — best-effort surface; backend may be empty */}
+      <div className="rounded-card border border-border bg-surface p-3 shadow-soft">
+        <div className="u-label mb-1">变更记录 (ChangeRecord)</div>
+        {changeRecords.length === 0 ? (
+          <p className="text-xs text-muted">（暂无 ChangeRecord）</p>
+        ) : (
+          <ul className="flex flex-col gap-1.5 text-xs">
+            {changeRecords.map((c) => (
+              <li
+                key={c.id}
+                className="flex flex-wrap items-center gap-x-2 gap-y-0.5"
+              >
+                <code className="text-muted">{shortId(c.id)}</code>
+                {c.kind ? (
+                  <span className="rounded-pill bg-accent-soft px-2 py-0.5 text-accent">
+                    {c.kind}
+                  </span>
+                ) : null}
+                {c.summary || c.reason ? (
+                  <span className="flex-1 truncate text-foreground">
+                    {c.summary || c.reason}
+                  </span>
+                ) : null}
+                {c.at ? (
+                  <span className="text-muted">{relativeTime(c.at)}</span>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
       {revisions.length === 0 ? (
         <div className="rounded-card border border-border bg-surface p-4 text-sm text-muted">
           当前任务暂无修订记录。
@@ -121,6 +164,10 @@ export function ChangeHistoryPanel(props: {
         <ol className="relative ml-1 flex flex-col gap-3 border-l border-border pl-4">
           {revisions.map((r: PlanRevisionLike) => {
             const archived = extractArchivedIds(r);
+            const linkedChangeRecordId = extractChangeRecordId(r);
+            const linkedChange = linkedChangeRecordId
+              ? changeRecords.find((c) => c.id === linkedChangeRecordId)
+              : undefined;
             return (
               <li key={r.id} className="relative">
                 <span
@@ -150,6 +197,17 @@ export function ChangeHistoryPanel(props: {
                   </div>
                   {r.reason ? (
                     <p className="mt-1.5 text-sm text-foreground">{r.reason}</p>
+                  ) : null}
+                  {linkedChange ? (
+                    <div className="mt-1.5 rounded-card border border-border bg-surface-strong px-2 py-1 text-xs text-muted">
+                      <span className="u-label mr-2">关联变更</span>
+                      <code>{shortId(linkedChange.id)}</code>
+                      {linkedChange.summary ? (
+                        <span className="ml-2 text-foreground">
+                          {linkedChange.summary}
+                        </span>
+                      ) : null}
+                    </div>
                   ) : null}
                   <div className="mt-2 flex items-center gap-3 text-xs">
                     <button
@@ -203,6 +261,18 @@ function extractArchivedIds(rev: PlanRevisionLike): string[] {
     for (const i of ids) if (typeof i === 'string') out.push(i);
   }
   return out;
+}
+
+function extractChangeRecordId(rev: PlanRevisionLike): string | undefined {
+  const r = rev as unknown as Record<string, unknown>;
+  const direct = r['changeRecordId'];
+  if (typeof direct === 'string') return direct;
+  const meta = r['metadata'];
+  if (meta && typeof meta === 'object') {
+    const m = (meta as Record<string, unknown>)['changeRecordId'];
+    if (typeof m === 'string') return m;
+  }
+  return undefined;
 }
 
 export default ChangeHistoryPanel;

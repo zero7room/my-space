@@ -3,7 +3,6 @@ import * as React from 'react';
 import { api } from '../../lib/api-client';
 import { cn } from '../../lib/cn';
 import { useConversationsStore } from '../../lib/stores/conversations';
-import { useTasksStore } from '../../lib/stores/tasks';
 
 function relativeTime(iso: string): string {
   const ts = new Date(iso).getTime();
@@ -29,7 +28,8 @@ export function Sidebar(props: {
   const setActive = useConversationsStore((s) => s.setActive);
   const upsertThread = useConversationsStore((s) => s.upsertThread);
   const setLoading = useConversationsStore((s) => s.setLoading);
-  const drawerOpen = useTasksStore((s) => s.drawerOpen);
+  const sidebarCollapsed = useConversationsStore((s) => s.sidebarCollapsed);
+  const setSidebarCollapsed = useConversationsStore((s) => s.setSidebarCollapsed);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -84,13 +84,22 @@ export function Sidebar(props: {
     [onDelete],
   );
 
-  if (drawerOpen) {
+  if (sidebarCollapsed) {
     // Collapsed: icon-only rail
     return (
       <div
         aria-label="会话轨道"
         className="flex h-full w-full flex-col items-center bg-transparent py-4"
       >
+        <button
+          type="button"
+          onClick={() => setSidebarCollapsed(false)}
+          aria-label="展开侧边栏"
+          title="展开"
+          className="mb-2 flex h-8 w-8 items-center justify-center rounded-pill text-xs text-muted hover:bg-surface-raised hover:text-foreground"
+        >
+          »
+        </button>
         <button
           type="button"
           onClick={handleCreate}
@@ -139,7 +148,18 @@ export function Sidebar(props: {
   return (
     <div className="flex h-full w-full flex-col bg-transparent">
       <div className="px-4 pb-2 pt-5">
-        <div className="u-label mb-3">Conversations</div>
+        <div className="mb-3 flex items-center justify-between">
+          <div className="u-label">Conversations</div>
+          <button
+            type="button"
+            onClick={() => setSidebarCollapsed(true)}
+            aria-label="折叠侧边栏"
+            title="折叠"
+            className="flex h-7 w-7 items-center justify-center rounded-pill text-xs text-muted hover:bg-surface-raised hover:text-foreground"
+          >
+            «
+          </button>
+        </div>
         <button
           type="button"
           onClick={handleCreate}

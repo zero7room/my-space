@@ -43,11 +43,29 @@ export function ToastContainer(): React.JSX.Element {
   );
 }
 
+const REASON_MAP: Record<string, string> = {
+  not_owner: '权限拒绝：仅任务发起人可操作',
+  invalid_state: '当前任务状态不允许此操作',
+  terminal_state: '任务已是终态，无法再变更',
+  cursor_too_old: '事件游标过旧，请刷新',
+  duplicate_request: '请求被去重',
+};
+
 export function showError(err: unknown): void {
-  const msg = err instanceof Error ? err.message : String(err);
-  let text = msg;
-  if (msg.includes('403')) text = '权限拒绝：仅任务发起人可操作';
-  else if (msg.includes('409')) text = '当前状态不允许此操作';
+  let text: string;
+  // Lazy duck-typed read to avoid an import cycle with api-client.
+  const e = err as { status?: number; reason?: string; message?: string } | null;
+  if (e && typeof e.status === 'number' && e.reason && REASON_MAP[e.reason]) {
+    text = REASON_MAP[e.reason];
+  } else if (e && e.status === 403) {
+    text = '权限拒绝（403）';
+  } else if (e && e.status === 409) {
+    text = '当前状态不允许此操作（409）';
+  } else if (e && typeof e.message === 'string' && e.message.length > 0) {
+    text = e.message;
+  } else {
+    text = String(err);
+  }
   useToastStore.getState().push({ kind: 'danger', text });
 }
 

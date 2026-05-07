@@ -1,160 +1,47 @@
 'use client';
 import * as React from 'react';
-import type { EventEnvelope } from '@ai-workflow/contracts';
 import { cn } from '../../lib/cn';
 import { api } from '../../lib/api-client';
-import { ThreadSseClient } from '../../lib/sse-client';
 import { useSseStore } from '../../lib/stores/sse';
-import { useTasksStore } from '../../lib/stores/tasks';
 import { MessageBubble, type ChatMessage } from './MessageBubble';
-import type { GuardDecision } from './GuardDecisionBadge';
-
-function toRole(input: unknown): ChatMessage['role'] {
-  if (input === 'user' || input === 'assistant' || input === 'system') {
-    return input;
-  }
-  return 'assistant';
-}
-
-function toStr(value: unknown, fallback = ''): string {
-  return typeof value === 'string' ? value : fallback;
-}
-
-function toGuardDecision(payload: Record<string, unknown>): GuardDecision | null {
-  const intent = payload['intent'];
-  if (typeof intent !== 'string') return null;
-  const shortCircuited =
-    payload['shortCircuited'] === true || payload['short_circuited'] === true;
-  const conf = payload['confidence'];
-  const confidence = typeof conf === 'number' ? conf : 0;
-  const rulesRaw = payload['ruleHits'] ?? payload['rule_hits'];
-  const ruleHits = Array.isArray(rulesRaw)
-    ? rulesRaw.filter((x): x is string => typeof x === 'string')
-    : undefined;
-  const reason = typeof payload['reason'] === 'string' ? payload['reason'] : undefined;
-  return { intent, shortCircuited, confidence, ruleHits, reason };
-}
 
 export function ChatWindow(props: {
   threadId: string | null;
 }): React.JSX.Element {
   const { threadId } = props;
-  const [messages, setMessages] = React.useState<ChatMessage[]>([]);
   const [input, setInput] = React.useState('');
   const [sending, setSending] = React.useState(false);
 
-  const clientRef = React.useRef<ThreadSseClient | null>(null);
   const scrollRef = React.useRef<HTMLDivElement | null>(null);
   const taRef = React.useRef<HTMLTextAreaElement | null>(null);
 
   const reloadRequired = useSseStore((s) => s.reloadRequired);
   const setReloadRequired = useSseStore((s) => s.setReloadRequired);
-  const setBlocked = useTasksStore((s) => s.setBlocked);
+  const messagesByThread = useSseStore((s) => s.messagesByThread);
+  const appendMessage = useSseStore((s) => s.appendMessage);
+  const resetMessages = useSseStore((s) => s.resetMessages);
 
-  const handleEvent = React.useCallback(
-    (ev: EventEnvelope) => {
-      const kind = ev.kind as string;
-      const payload = (ev.payload ?? {}) as Record<string, unknown>;
+  const messages: ChatMessage[] = React.useMemo(() => {
+    if (!threadId) return [];
+    const list = messagesByThread[threadId] ?? [];
+    return list.map(
+      (m): ChatMessage => ({
+        id: m.id,
+        role: m.role,
+        text: m.text,
+        at: m.at,
+        guardDecision: m.guardDecision,
+      }),
+    );
+  }, [messagesByThread, threadId]);
 
-      // Messages appended to the thread
-      if (kind === 'message_appended' || kind === 'team_message_appended') {
-        const role = toRole(payload['role']);
-        const text =
-          toStr(payload['text']) ||
-          toStr(payload['content']) ||
-          toStr(payload['body']);
-        if (!text) return;
-        const id =
-          toStr(payload['messageId']) ||
-          toStr(payload['id']) ||
-          ev.id ||
-          `${ev.seq}`;
-        const at = toStr(payload['at']) || ev.at;
-        setMessages((prev) => {
-          if (prev.some((m) => m.id === id)) return prev;
-          return [...prev, { id, role, text, at }];
-        });
-        return;
-      }
-
-      // Attach guard decision to the last user message
-      if (kind === 'guard_decision_recorded') {
-        const decision = toGuardDecision(payload);
-        if (!decision) return;
-        setMessages((prev) => {
-          for (let i = prev.length - 1; i >= 0; i -= 1) {
-            if (prev[i].role === 'user') {
-              const next = prev.slice();
-              next[i] = { ...next[i], guardDecision: decision };
-              return next;
-            }
-          }
-          return prev;
-        });
-        return;
-      }
-
-      // Task blocked / unblocked — forward to tasks store
-      if (kind === 'task_blocked') {
-        const taskId = toStr(ev.taskId) || toStr(payload['taskId']);
-        if (!taskId) return;
-        const blockedReason = toStr(payload['blockedReason']) || '任务已阻塞';
-        const sa = payload['suggestedActions'];
-        const suggestedActions = Array.isArray(sa)
-          ? sa.filter((x): x is string => typeof x === 'string')
-          : [];
-        setBlocked(taskId, { taskId, blockedReason, suggestedActions });
-        return;
-      }
-
-      if (kind === 'task_unblocked') {
-        const taskId = toStr(ev.taskId) || toStr(payload['taskId']);
-        if (!taskId) return;
-        setBlocked(taskId, null);
-        return;
-      }
-    },
-    [setBlocked],
-  );
-
-  // Start / restart the SSE client on threadId change
-  React.useEffect(() => {
-    if (clientRef.current) {
-      clientRef.current.close();
-      clientRef.current = null;
-    }
-    setMessages([]);
-    if (!threadId) return;
-    const c = new ThreadSseClient({
-      threadId,
-      onEvent: handleEvent,
-      onError: () => {
-        /* DegradedBanner surfaces state via useSseStore */
-      },
-    });
-    clientRef.current = c;
-    c.start();
-    return () => {
-      c.close();
-      if (clientRef.current === c) clientRef.current = null;
-    };
-  }, [threadId, handleEvent]);
-
-  // Reload-required: clear messages, close current stream, restart fresh
+  // Reload-required: clear messages for this thread and let the parent
+  // WorkbenchPage's SSE client repopulate.
   React.useEffect(() => {
     if (!reloadRequired) return;
-    if (clientRef.current) {
-      clientRef.current.close();
-      clientRef.current = null;
-    }
-    setMessages([]);
-    if (threadId) {
-      const c = new ThreadSseClient({ threadId, onEvent: handleEvent });
-      clientRef.current = c;
-      c.start();
-    }
+    if (threadId) resetMessages(threadId);
     setReloadRequired(false);
-  }, [reloadRequired, threadId, handleEvent, setReloadRequired]);
+  }, [reloadRequired, threadId, resetMessages, setReloadRequired]);
 
   // Scroll to bottom on new message
   React.useEffect(() => {
@@ -179,24 +66,18 @@ export function ChatWindow(props: {
     setSending(true);
     const optimisticId = `local-${Date.now()}`;
     const at = new Date().toISOString();
-    setMessages((prev) => [
-      ...prev,
-      { id: optimisticId, role: 'user', text, at },
-    ]);
+    appendMessage(threadId, { id: optimisticId, role: 'user', text, at });
     setInput('');
     try {
       await api.postMessage(threadId, text);
     } catch {
-      // Revert the optimistic bubble on failure
-      setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
+      // Optimistic bubble stays for now; the SSE replay should reconcile.
     } finally {
       setSending(false);
     }
-  }, [input, threadId, sending]);
+  }, [input, threadId, sending, appendMessage]);
 
   const stop = React.useCallback(() => {
-    if (clientRef.current) clientRef.current.close();
-    clientRef.current = null;
     setSending(false);
   }, []);
 

@@ -2,9 +2,11 @@
  * Thin API client for the bot-runtime. Reads token from `NEXT_PUBLIC_BEARER`
  * (dev only — production should resolve via session cookie).
  */
-import { API_ROUTES } from '@ai-workflow/contracts';
+import { API_PREFIX, API_ROUTES } from '@ai-workflow/contracts';
 import type {
+  ArtifactGetResponse,
   ChannelBindingListResponse,
+  ChannelConfigsResponse,
   PolicyListResponse,
   PlanListResponse,
   RetryHistoryResponse,
@@ -23,12 +25,49 @@ function token(): string {
   return process.env['NEXT_PUBLIC_BEARER'] ?? '';
 }
 
+/**
+ * Typed API error. Surfaces HTTP status, optional `reason` from the server's
+ * `{ error: { reason, message } }` envelope, and the raw body for debugging.
+ */
+export class ApiError extends Error {
+  status: number;
+  reason?: string;
+  details?: unknown;
+  constructor(message: string, status: number, reason?: string, details?: unknown) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.reason = reason;
+    this.details = details;
+  }
+}
+
+async function parseError(res: Response): Promise<ApiError> {
+  let body: unknown = null;
+  try {
+    body = await res.json();
+  } catch {
+    /* non-JSON or empty body */
+  }
+  const b = body as
+    | {
+        error?: { reason?: string; message?: string };
+        reason?: string;
+        message?: string;
+      }
+    | null;
+  const reason = b?.error?.reason ?? b?.reason;
+  const message =
+    b?.error?.message ?? b?.message ?? `${res.status} ${res.statusText}`;
+  return new ApiError(message, res.status, reason, body);
+}
+
 async function get<T>(p: string): Promise<T> {
   const res = await fetch(`${BASE}${p}`, {
     headers: { authorization: `Bearer ${token()}` },
     cache: 'no-store',
   });
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  if (!res.ok) throw await parseError(res);
   return res.json() as Promise<T>;
 }
 
@@ -42,9 +81,32 @@ async function post<T>(p: string, body?: unknown): Promise<T> {
     body: body ? JSON.stringify(body) : undefined,
     cache: 'no-store',
   });
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  if (!res.ok) throw await parseError(res);
   return res.json() as Promise<T>;
 }
+
+async function del(p: string): Promise<void> {
+  const res = await fetch(`${BASE}${p}`, {
+    method: 'DELETE',
+    headers: { authorization: `Bearer ${token()}` },
+  });
+  if (!res.ok) throw await parseError(res);
+}
+
+// TODO: type when contract lands — PlanRevision response
+type PlanRevisionLike = unknown;
+// TODO: type when contract lands — ChangeRecord response
+export type ChangeRecordEntry = {
+  id: string;
+  taskId?: string;
+  revisionId?: string;
+  kind?: string;
+  summary?: string;
+  reason?: string;
+  at?: string;
+  payload?: unknown;
+};
+export type ChangeRecordsResponse = { entries: ChangeRecordEntry[] };
 
 export const api = {
   listThreads: () => get<ThreadListResponse>(API_ROUTES.threads.list),
@@ -89,41 +151,65 @@ export const api = {
   rejectPlan: (taskId: string, revisionId: string) =>
     post<TaskActionResponse>(API_ROUTES.tasks.rejectPlan(taskId, revisionId)),
   getPlanRevision: (taskId: string, revisionId: string) =>
-    get<unknown>(API_ROUTES.tasks.plan(taskId, revisionId)),
+    get<PlanRevisionLike>(API_ROUTES.tasks.plan(taskId, revisionId)),
+  // ChangeRecord (best-effort; backend may not yet expose this route)
+  changeRecords: async (taskId: string): Promise<ChangeRecordsResponse> => {
+    try {
+      const res = await fetch(`${BASE}${API_PREFIX}/tasks/${taskId}/change-records`, {
+        headers: { authorization: `Bearer ${token()}` },
+        cache: 'no-store',
+      });
+      if (res.status === 404) return { entries: [] };
+      if (!res.ok) return { entries: [] };
+      const body = (await res.json()) as ChangeRecordsResponse | { records?: ChangeRecordEntry[] };
+      const entries =
+        (body as ChangeRecordsResponse).entries ??
+        (body as { records?: ChangeRecordEntry[] }).records ??
+        [];
+      return { entries };
+    } catch {
+      return { entries: [] };
+    }
+  },
   // Channels
-  listChannelConfigs: () => get<unknown>(API_ROUTES.channels.listConfigs),
+  listChannelConfigs: () => get<ChannelConfigsResponse>(API_ROUTES.channels.listConfigs),
   putChannelConfig: (provider: string, body: unknown) =>
+    // TODO: type when contract lands — putChannelConfig response
     post<unknown>(API_ROUTES.channels.putConfig(provider), body),
-  createBinding: (body: unknown) => post<unknown>(API_ROUTES.channels.createBinding, body),
-  deleteBinding: (id: string) =>
-    fetch(`${BASE}${API_ROUTES.channels.deleteBinding(id)}`, {
-      method: 'DELETE',
-      headers: { authorization: `Bearer ${token()}` },
-    }).then(() => undefined),
+  createBinding: (body: unknown) =>
+    // TODO: type when contract lands — createBinding response
+    post<unknown>(API_ROUTES.channels.createBinding, body),
+  deleteBinding: (id: string) => del(API_ROUTES.channels.deleteBinding(id)),
   // Artifacts
-  getArtifact: (id: string) => get<unknown>(API_ROUTES.artifacts.get(id)),
-  resealArtifact: (id: string) => post<unknown>(API_ROUTES.artifacts.reseal(id)),
+  getArtifact: (id: string) => get<ArtifactGetResponse>(API_ROUTES.artifacts.get(id)),
+  resealArtifact: (id: string) =>
+    // TODO: type when contract lands — reseal response
+    post<unknown>(API_ROUTES.artifacts.reseal(id)),
   // Teams actions
   cancelTeam: (taskId: string, teamId: string) =>
+    // TODO: type when contract lands
     post<unknown>(API_ROUTES.teams.cancel(taskId, teamId)),
   approveTeammate: (taskId: string, teamId: string, teammateId: string) =>
+    // TODO: type when contract lands
     post<unknown>(API_ROUTES.teams.approveTeammate(taskId, teamId, teammateId)),
   rejectTeammate: (taskId: string, teamId: string, teammateId: string) =>
+    // TODO: type when contract lands
     post<unknown>(API_ROUTES.teams.rejectTeammate(taskId, teamId, teammateId)),
   teammateEvents: (taskId: string, teamId: string, teammateId: string) =>
+    // TODO: type when contract lands — events response
     get<unknown>(API_ROUTES.teams.teammateEvents(taskId, teamId, teammateId)),
   teamEvents: (taskId: string, teamId: string) =>
+    // TODO: type when contract lands
     get<unknown>(API_ROUTES.teams.events(taskId, teamId)),
   recoveryLog: (taskId: string, teamId: string) =>
+    // TODO: type when contract lands
     get<unknown>(API_ROUTES.teams.recoveryLog(taskId, teamId)),
   // Policies
   createPolicy: (body: unknown) =>
+    // TODO: type when contract lands
     post<unknown>(API_ROUTES.criticalNodePolicies.create, body),
   updatePolicy: (id: string, body: unknown) =>
+    // TODO: type when contract lands
     post<unknown>(API_ROUTES.criticalNodePolicies.update(id), body),
-  deletePolicy: (id: string) =>
-    fetch(`${BASE}${API_ROUTES.criticalNodePolicies.delete(id)}`, {
-      method: 'DELETE',
-      headers: { authorization: `Bearer ${token()}` },
-    }).then(() => undefined),
+  deletePolicy: (id: string) => del(API_ROUTES.criticalNodePolicies.delete(id)),
 };

@@ -4,10 +4,12 @@ import type { TaskActionResponse } from '@ai-workflow/contracts';
 import { api } from '../../lib/api-client';
 import { cn } from '../../lib/cn';
 import { useTasksStore } from '../../lib/stores/tasks';
+import { TaskActions } from '../TaskActions';
 import { ArtifactPanel } from './ArtifactPanel';
 import { ChangeHistoryPanel } from './ChangeHistoryPanel';
 import { LogViewer } from './LogViewer';
 import { PlanProgressSection } from './PlanProgressSection';
+import { RetryHistoryView } from './RetryHistoryView';
 import { TaskDetailTabs } from './TaskDetailTabs';
 
 // TeamPanel lives in P0-B5 agent's file. Lazy-load with a graceful fallback so
@@ -176,6 +178,7 @@ export function TaskDetailPanel(props: {
               <ChangeHistoryPanel taskId={taskId} />
             ) : null}
             {detailTab === 'log' ? <LogViewer taskId={taskId} /> : null}
+            {detailTab === 'retry' ? <RetryHistoryView taskId={taskId} /> : null}
             {detailTab === 'team' ? (
               /* TeamPanel — provided by P0-B5 agent, import from './TeamPanel' */
               <React.Suspense
@@ -261,11 +264,34 @@ function SummarySection(props: {
 
       <section className="rounded-card border border-border bg-surface p-3">
         <div className="u-label mb-1">任务操作</div>
-        {/* TaskActions placeholder: wired in P0-C */}
-        <p className="text-xs text-muted">
-          操作按钮将在 P0-C 接入（现有 TaskActions 组件会挂载到此处）。
-        </p>
+        {retry?.nextRetryAt ? <RetryCountdown at={retry.nextRetryAt} /> : null}
+        <TaskActions
+          taskId={props.taskId}
+          status={task.status}
+          blockedReason={task.blockedReason}
+        />
       </section>
+    </div>
+  );
+}
+
+/**
+ * Countdown row for retry_pending. Shows "X 秒后自动重试" while remaining > 0,
+ * then "正在重试…" once we're past the deadline.
+ */
+function RetryCountdown(props: { at: string }): React.JSX.Element {
+  const { at } = props;
+  const target = React.useMemo(() => new Date(at).getTime(), [at]);
+  const [now, setNow] = React.useState(() => Date.now());
+  React.useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  if (!Number.isFinite(target)) return <span className="hidden" />;
+  const remaining = Math.max(0, Math.ceil((target - now) / 1000));
+  return (
+    <div className="mb-2 text-xs text-warning">
+      {remaining > 0 ? `${remaining} 秒后自动重试` : '正在重试…'}
     </div>
   );
 }

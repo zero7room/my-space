@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { cn } from '../../lib/cn';
 import { api } from '../../lib/api-client';
+import { useSseStore } from '../../lib/stores/sse';
 import { showError, showSuccess } from './ToastProvider';
 
 // ---------------------------------------------------------------------------
@@ -209,6 +210,7 @@ function usePoll<T>(
   const [data, setData] = React.useState<T | null>(null);
   const [err, setErr] = React.useState<string | null>(null);
   const [nonce, setNonce] = React.useState(0);
+  const paused = useSseStore((s) => s.replaying || s.reloadRequired);
 
   const run = React.useCallback(async () => {
     try {
@@ -235,13 +237,18 @@ function usePoll<T>(
       }
     };
     void tick();
+    if (paused) {
+      return () => {
+        cancelled = true;
+      };
+    }
     const t = setInterval(() => void tick(), intervalMs);
     return () => {
       cancelled = true;
       clearInterval(t);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [...deps, nonce, intervalMs]);
+  }, [...deps, nonce, intervalMs, paused]);
 
   return {
     data,

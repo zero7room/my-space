@@ -12,7 +12,7 @@ type State = {
   // selected task id for TaskDrawer detail view
   selectedId: string | null;
   drawerOpen: boolean;
-  detailTab: 'summary' | 'plan' | 'changes' | 'log' | 'team' | 'artifact';
+  detailTab: 'summary' | 'plan' | 'changes' | 'log' | 'retry' | 'team' | 'artifact';
   // artifact drift map populated from artifact_consistency_warning events
   driftedArtifacts: Record<string, string>; // artifactId → reason
   setBlocked: (taskId: string, info: BlockedInfo | null) => void;
