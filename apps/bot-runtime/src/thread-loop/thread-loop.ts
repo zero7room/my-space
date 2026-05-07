@@ -20,6 +20,8 @@ import {
 import type { RuntimePaths } from '../runtime/paths.js';
 import type { SseRegistry } from '../runtime/sse/index.js';
 
+import { markThreadChattingIfDone } from './thread-state.js';
+
 interface ThreadLoopDeps {
   rt: RuntimePaths;
   sse?: SseRegistry;
@@ -102,6 +104,13 @@ export class ThreadLoop {
         at: now,
       });
       if (this.deps.sse) this.deps.sse.publish(ev);
+      await markThreadChattingIfDone(
+        this.deps.rt,
+        threadId,
+        next,
+        this.deps.sse,
+        () => now,
+      );
       return { task: next, event: ev };
     }
     if (sig.kind === 'pause') {

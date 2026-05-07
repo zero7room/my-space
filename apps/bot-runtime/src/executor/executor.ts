@@ -135,6 +135,16 @@ export class Executor {
           at: this.now,
         });
         if (this.deps.sse) this.deps.sse.publish(ev);
+        const { markThreadChattingIfDone } = await import(
+          '../thread-loop/thread-state.js'
+        );
+        await markThreadChattingIfDone(
+          this.deps.rt,
+          opts.threadId,
+          task,
+          this.deps.sse,
+          () => this.now,
+        );
         return { finalStatus: 'completed', steps };
       }
       if ('kind' in proposed && proposed.kind === 'ask') {

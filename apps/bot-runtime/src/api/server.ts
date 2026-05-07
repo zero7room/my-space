@@ -25,8 +25,9 @@ import {
 import { TokenAuthService, parseLocalUserTokens } from '../auth/user-token.js';
 import { RuntimePaths } from '../runtime/paths.js';
 import { RecoveryScanner } from '../runtime/recovery.js';
-import { SseRegistry } from '../runtime/sse/index.js';
+import { AckSweeper, SseRegistry } from '../runtime/sse/index.js';
 import { TaskIndex } from '../runtime/task-index.js';
+import { DedupeReaper } from '../runtime/dedupe-reaper.js';
 
 import { registerHealthRoutes } from './routes/health.js';
 import { registerUserRoutes } from './routes/users.js';
@@ -135,6 +136,16 @@ export async function createServer(cfg: ServerConfig): Promise<ServerHandle> {
   registerSkillRoutes(app, { rt });
   registerTeamRoutes(app, { rt, taskIndex });
 
+  const ackSweeper = new AckSweeper({ sse, intervalMs: 10_000 });
+  const dedupeReaper = new DedupeReaper({
+    rt,
+    intervalMs: 60 * 60 * 1000,
+  });
+  if (!cfg.skipLock) {
+    ackSweeper.start();
+    dedupeReaper.start();
+  }
+
   return {
     app,
     rt,
@@ -142,6 +153,8 @@ export async function createServer(cfg: ServerConfig): Promise<ServerHandle> {
     taskIndex,
     lock,
     async close() {
+      ackSweeper.stop();
+      dedupeReaper.stop();
       await app.close();
       if (lock) {
         await releaseInstanceLock(rt.paths.lockFile);

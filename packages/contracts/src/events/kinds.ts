@@ -111,6 +111,13 @@ export const RUNTIME_EVENT_KINDS = [
   'critical_policy_changed',
   'skills_load_error',
   'skills_loaded',
+  'skills_fallback_to_cache',
+  'artifact_consistency_warning',
+  'events_jsonl_rotated',
+  'sse_ack_missing',
+  'sse_replay_emitted',
+  'sse_replay_truncated',
+  'thread_returned_to_chatting',
 ] as const;
 export type RuntimeEventKind = (typeof RUNTIME_EVENT_KINDS)[number];
 

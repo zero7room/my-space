@@ -272,11 +272,11 @@ export class RecoveryScanner {
             if (actual !== a.sha256) {
               artifactWarnings++;
               append({
-                kind: 'sanitization_applied', // closest event kind; semantic: artifact_consistency_warning
+                kind: 'artifact_consistency_warning',
                 threadId,
                 taskId,
                 payload: {
-                  warning: 'artifact_sha256_mismatch',
+                  warning: 'sha256_mismatch',
                   artifactId: a.id,
                   recordedSha256: a.sha256,
                   actualSha256: actual,
@@ -288,10 +288,10 @@ export class RecoveryScanner {
             if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
               artifactWarnings++;
               append({
-                kind: 'sanitization_applied',
+                kind: 'artifact_consistency_warning',
                 threadId,
                 taskId,
-                payload: { warning: 'artifact_missing', artifactId: a.id },
+                payload: { warning: 'missing', artifactId: a.id },
                 at: this.clock.iso(),
               });
             }

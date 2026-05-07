@@ -178,6 +178,77 @@ export const askClarificationTool: ToolDefinition<
   handler: async () => ({ ack: true }),
 };
 
+/**
+ * bash: run a shell command inside the task's workspace. The cwd is forced to
+ * `taskWorkspace`, environment is scrubbed of HOST and process env by default,
+ * stdout / stderr are captured into `{stdout, stderr, exitCode}`. The tool is
+ * `non_idempotent` so CriticalNodePolicy can gate it via the `tool:bash`
+ * matcher. Timeouts cap at 2 minutes by default.
+ *
+ * We deliberately avoid spawning a shell (`/bin/sh -c "<cmd>"` style) to
+ * prevent trivial traversal via `cd /etc && cat passwd`: bash receives
+ * `command` + `args` arrays. Callers wanting a pipeline must decompose it.
+ */
+export const bashTool: ToolDefinition<
+  {
+    command: string;
+    args?: string[];
+    timeoutMs?: number;
+  },
+  { stdout: string; stderr: string; exitCode: number }
+> = {
+  name: 'bash',
+  description:
+    'Run a command inside the task workspace with cwd pinned and timeout',
+  idempotency: 'non_idempotent',
+  inputSchema: z
+    .object({
+      command: z
+        .string()
+        .min(1)
+        .regex(/^[\w./:-]+$/, 'command must be an alphanumeric binary name'),
+      args: z.array(z.string()).max(64).optional(),
+      timeoutMs: z.number().int().min(100).max(120_000).optional(),
+    })
+    .strict(),
+  handler: async (ctx, input) => {
+    const { spawn } = await import('node:child_process');
+    const cwd = ctx.rt.paths.taskWorkspace(ctx.threadId, ctx.task.id);
+    await (await import('@ai-workflow/fs-store')).ensureDir(cwd);
+    return new Promise((resolve, reject) => {
+      const child = spawn(input.command, input.args ?? [], {
+        cwd,
+        env: {
+          PATH: process.env['PATH'] ?? '/usr/bin:/bin',
+          HOME: cwd,
+          LANG: process.env['LANG'] ?? 'C.UTF-8',
+        },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      const timer = setTimeout(
+        () => child.kill('SIGKILL'),
+        input.timeoutMs ?? 30_000,
+      );
+      let stdout = '';
+      let stderr = '';
+      child.stdout.on('data', (d: Buffer) => {
+        stdout += d.toString('utf8');
+      });
+      child.stderr.on('data', (d: Buffer) => {
+        stderr += d.toString('utf8');
+      });
+      child.on('error', (err) => {
+        clearTimeout(timer);
+        reject(err);
+      });
+      child.on('close', (code) => {
+        clearTimeout(timer);
+        resolve({ stdout, stderr, exitCode: code ?? -1 });
+      });
+    });
+  },
+};
+
 export const presentFilesTool: ToolDefinition<
   { paths: string[] },
   { count: number }
@@ -247,5 +318,6 @@ export function createDefaultRegistry(): ToolRegistry {
   r.register(strReplaceTool);
   r.register(askClarificationTool);
   r.register(presentFilesTool);
+  r.register(bashTool);
   return r;
 }

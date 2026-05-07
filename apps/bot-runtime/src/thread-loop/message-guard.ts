@@ -12,6 +12,10 @@
  *   - client / private direct: default to LLM guard.
  *   - slash commands `/confirm`, `/cancel`, `/pause`, `/resume`, `/status` map
  *     to fixed intents.
+ *
+ * A built-in `HeuristicLlmGuard` gives callers a deterministic v1 fallback
+ * when a real model adapter isn't wired: keyword spotting for `new_task` /
+ * `progress_query` / `plan_update` / `irrelevant` signals.
  */
 import {
   type GuardDecision,
@@ -174,4 +178,55 @@ function requiresConfirm(intent: Intent): boolean {
     intent === 'task_update' ||
     intent === 'plan_update'
   );
+}
+
+/**
+ * Deterministic keyword-based guard for v1. Not a replacement for a real LLM
+ * but good enough to escape the `guard_degraded` state in smoke tests and
+ * give evals a plausible baseline.
+ */
+export class HeuristicLlmGuard implements LlmGuardAdapter {
+  constructor(private readonly now: () => string = () => new Date().toISOString()) {}
+  async classify(input: GuardInput): Promise<GuardDecision> {
+    const t = input.text.toLowerCase();
+    const id = newGuardDecisionId();
+    const base = {
+      id,
+      messageId: input.messageId,
+      threadId: input.threadId,
+      fromUserId: input.fromUserId,
+      source: input.source,
+      shortCircuited: false,
+      ruleHits: ['heuristic-llm'] as string[],
+      confidence: 0.65,
+      reason: 'heuristic-llm classification',
+      createdAt: this.now(),
+    } as const;
+    if (/\b(status|progress|where are we|update)\b/.test(t)) {
+      return { ...base, intent: 'progress_query', requiresUserConfirmation: false };
+    }
+    if (/\b(cancel|abort|stop)\b/.test(t)) {
+      return { ...base, intent: 'cancel_task', requiresUserConfirmation: false };
+    }
+    if (/\b(pause|hold)\b/.test(t)) {
+      return { ...base, intent: 'pause_task', requiresUserConfirmation: false };
+    }
+    if (/\b(resume|continue)\b/.test(t)) {
+      return { ...base, intent: 'resume_task', requiresUserConfirmation: false };
+    }
+    if (/\b(change|revise|update the plan|new plan|switch)\b/.test(t)) {
+      return { ...base, intent: 'plan_update', requiresUserConfirmation: true };
+    }
+    if (
+      /\b(draft|create|plan|write|implement|build|run|generate|design|fix)\b/.test(
+        t,
+      )
+    ) {
+      return { ...base, intent: 'new_task', requiresUserConfirmation: true };
+    }
+    if (/\b(lunch|pizza|standup|chatter|demo|recap|notes)\b/.test(t)) {
+      return { ...base, intent: 'chat', requiresUserConfirmation: false };
+    }
+    return { ...base, intent: 'chat', requiresUserConfirmation: false };
+  }
 }

@@ -211,4 +211,11 @@ export class SseRegistry {
     if (!event.threadId) return;
     this.forThread(event.threadId).publish(event);
   }
+
+  /**
+   * Iterate every thread bus; used by the ack-sweeper.
+   */
+  threadEntries(): Array<[string, ThreadEventBus]> {
+    return [...this.threads.entries()];
+  }
 }
