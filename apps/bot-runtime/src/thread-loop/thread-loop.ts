@@ -19,14 +19,37 @@ import {
 
 import type { RuntimePaths } from '../runtime/paths.js';
 import type { SseRegistry } from '../runtime/sse/index.js';
+import type { NotifyThrottle } from '../retry/notify-throttle.js';
 
 import { markThreadChattingIfDone } from './thread-state.js';
 
 interface ThreadLoopDeps {
   rt: RuntimePaths;
   sse?: SseRegistry;
+  /**
+   * Optional notify throttle. When set, manual_retry signals will reset the
+   * per-(provider,target,task,kind) windows for all 4 notificationKinds so
+   * the user's decision is not suppressed by a stale window (acceptance #43).
+   */
+  notifyThrottle?: NotifyThrottle;
+  /**
+   * Optional resolver for the channel bindings attached to a thread; returns
+   * (provider, externalId/target) tuples whose throttle windows should be
+   * reset on manual_retry. Caller is responsible for hydrating from
+   * ChannelBindingRepository.
+   */
+  resolveBindings?: (
+    threadId: string,
+  ) => Promise<Array<{ provider: string; externalId: string }>>;
   now?: () => string;
 }
+
+const NOTIFICATION_KINDS = [
+  'task_blocked',
+  'task_completed',
+  'task_failed',
+  'critical_node_required',
+] as const;
 
 export class ThreadLoop {
   constructor(private readonly deps: ThreadLoopDeps) {}
@@ -166,6 +189,25 @@ export class ThreadLoop {
       });
       next.lastUserSignalAt = now;
       await this.deps.rt.tasks.update(next);
+      // Acceptance #43: clear per-key throttle windows for all 4 notification
+      // kinds so the user's manual retry isn't muted by a stale window.
+      if (this.deps.notifyThrottle && this.deps.resolveBindings) {
+        try {
+          const bindings = await this.deps.resolveBindings(threadId);
+          for (const b of bindings) {
+            for (const kind of NOTIFICATION_KINDS) {
+              this.deps.notifyThrottle.reset({
+                provider: b.provider,
+                externalId: b.externalId,
+                taskId: next.id,
+                notificationKind: kind,
+              });
+            }
+          }
+        } catch {
+          /* best-effort */
+        }
+      }
       const ev = await this.deps.rt.tasks.appendEvent(threadId, next.id, {
         kind: 'task_manual_retry_requested',
         taskId: next.id,

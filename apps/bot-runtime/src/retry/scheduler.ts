@@ -23,6 +23,7 @@ import {
 } from '@ai-workflow/contracts';
 
 import type { RuntimePaths } from '../runtime/paths.js';
+import { jaccardSimilarity } from './jaccard.js';
 
 const BACKOFF_SCHEDULE_MS = [5_000, 30_000, 5 * 60_000];
 
@@ -137,6 +138,30 @@ export class RetryScheduler {
       lastFailureReason: failureReason,
       nextRetryAt: nextAt,
     };
+    // Acceptance 29: when this and the previous transient_error retries have
+    // dissimilar reasons (jaccard < 0.5), surface a classification warning so
+    // operators can investigate whether assertion_error is masquerading.
+    if (
+      cur.attemptCount >= 1 &&
+      cur.failureClass === 'transient_error' &&
+      typeof cur.lastFailureReason === 'string' &&
+      cur.lastFailureReason.length > 0
+    ) {
+      const sim = jaccardSimilarity(cur.lastFailureReason, failureReason);
+      if (sim < 0.5) {
+        await this.rt.tasks.appendEvent(input.threadId, input.task.id, {
+          kind: 'task_retry_classification_warning',
+          taskId: input.task.id,
+          threadId: input.threadId,
+          payload: {
+            attemptCount: next.attemptCount,
+            similarity: sim,
+            hint: 'consider_assertion_error',
+          },
+          at: new Date(this.now()).toISOString(),
+        });
+      }
+    }
     const ev = await this.rt.tasks.appendEvent(input.threadId, input.task.id, {
       kind: 'task_retry_scheduled',
       taskId: input.task.id,

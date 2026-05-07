@@ -21,38 +21,87 @@ import {
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
 
-const MAX_BYTES = Number.parseInt(
-  process.env['RUNTIME_EVENTS_JSONL_MAX_BYTES'] ?? `${64 * 1024 * 1024}`,
-  10,
-);
-const MAX_AGE_DAYS = Number.parseInt(
-  process.env['RUNTIME_EVENTS_JSONL_MAX_AGE_DAYS'] ?? '30',
-  10,
-);
+function getMaxBytes(): number {
+  return Number.parseInt(
+    process.env['RUNTIME_EVENTS_JSONL_MAX_BYTES'] ?? `${64 * 1024 * 1024}`,
+    10,
+  );
+}
+function getMaxAgeDays(): number {
+  return Number.parseInt(
+    process.env['RUNTIME_EVENTS_JSONL_MAX_AGE_DAYS'] ?? '30',
+    10,
+  );
+}
 
 /**
  * Rotate `events.jsonl` when it exceeds `MAX_BYTES` or its mtime is older than
  * `MAX_AGE_DAYS`. The rotated file moves to `events-archive/<id>.jsonl` and
  * the active file is restarted empty. The seq sidecar is preserved so seq
  * counts keep advancing.
+ *
+ * Returns rotation metadata when a rotation happened so the caller can append
+ * an `events_jsonl_rotated` (or `events_jsonl_rotation_failed`) marker into
+ * the freshly-restarted log per acceptance #44.
  */
-async function maybeRotateEventsLog(logPath: string): Promise<void> {
+async function maybeRotateEventsLog(
+  logPath: string,
+): Promise<
+  | { rotated: false }
+  | {
+      rotated: true;
+      archivedFile: string;
+      archivedSize: number;
+      archivedAgeDays: number;
+      reason: 'size_overflow' | 'age_overflow';
+      activeSizeBytes: number;
+    }
+  | {
+      rotated: false;
+      failed: true;
+      errorClass: 'io_error' | 'compress_error' | 'rename_error';
+    }
+> {
   let stat: import('node:fs').Stats;
   try {
     stat = await fs.stat(logPath);
   } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return;
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return { rotated: false };
     throw err;
   }
   const ageMs = Date.now() - stat.mtimeMs;
-  const tooBig = stat.size >= MAX_BYTES;
-  const tooOld = ageMs >= MAX_AGE_DAYS * 24 * 60 * 60 * 1000;
-  if (!tooBig && !tooOld) return;
+  const tooBig = stat.size >= getMaxBytes();
+  const tooOld = ageMs >= getMaxAgeDays() * 24 * 60 * 60 * 1000;
+  if (!tooBig && !tooOld) return { rotated: false };
   const dir = path.join(path.dirname(logPath), 'events-archive');
-  await ensureDir(dir);
-  const archiveId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  try {
+    await ensureDir(dir);
+  } catch {
+    return { rotated: false, failed: true, errorClass: 'io_error' };
+  }
+  // Acceptance 44: archive-id = <startTimestamp>-<endTimestamp>-<sha256-prefix-8>
+  const start = Math.floor(stat.birthtimeMs ?? stat.ctimeMs).toString(36);
+  const end = Math.floor(stat.mtimeMs).toString(36);
+  const { createHash } = await import('node:crypto');
+  const hashPrefix = createHash('sha256')
+    .update(`${logPath}-${stat.size}-${end}-${Math.random()}`)
+    .digest('hex')
+    .slice(0, 8);
+  const archiveId = `${start}-${end}-${hashPrefix}`;
   const target = path.join(dir, `${archiveId}.jsonl`);
-  await atomicRename(logPath, target);
+  try {
+    await atomicRename(logPath, target);
+  } catch {
+    return { rotated: false, failed: true, errorClass: 'rename_error' };
+  }
+  return {
+    rotated: true,
+    archivedFile: target,
+    archivedSize: stat.size,
+    archivedAgeDays: Math.floor(ageMs / (24 * 60 * 60 * 1000)),
+    reason: tooBig ? 'size_overflow' : 'age_overflow',
+    activeSizeBytes: 0,
+  };
 }
 
 export class TaskRepository {
@@ -95,7 +144,33 @@ export class TaskRepository {
     event: Omit<EventEnvelope, 'id' | 'seq'>,
   ): Promise<EventEnvelope> {
     const log = this.paths.taskEventsLog(threadId, taskId);
-    await maybeRotateEventsLog(log);
+    const rot = await maybeRotateEventsLog(log);
+    if (rot.rotated === true) {
+      // Append a marker into the freshly-restarted log so retry-history
+      // (and the SSE stream after replay) sees the rotation breakpoint.
+      await appendEvent(log, {
+        kind: 'events_jsonl_rotated',
+        threadId,
+        taskId,
+        payload: {
+          archivedFile: rot.archivedFile,
+          archivedSize: rot.archivedSize,
+          archivedAgeDays: rot.archivedAgeDays,
+          reason: rot.reason,
+        },
+        at: new Date().toISOString(),
+      });
+    } else if ('failed' in rot && rot.failed) {
+      await appendEvent(log, {
+        kind: 'events_jsonl_rotation_failed',
+        threadId,
+        taskId,
+        payload: {
+          errorClass: rot.errorClass,
+        },
+        at: new Date().toISOString(),
+      });
+    }
     const written = await appendEvent(log, { ...event, kind: event.kind });
     return eventEnvelopeSchema.parse(written);
   }
