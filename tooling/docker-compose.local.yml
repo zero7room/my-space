@@ -1,4 +1,57 @@
-# Local Docker compose for development. Currently a no-op placeholder for v1 hybrid
-# (single bot-runtime process, single web). Filled in during Phase 11 (Ops).
-version: "3.9"
-services: {}
+version: '3.8'
+
+services:
+  bot-runtime:
+    build:
+      context: ../
+      dockerfile: tooling/bot-runtime.Dockerfile
+    ports:
+      - "4000:4000"
+    environment:
+      RUNTIME_ID: default
+      PORT: "4000"
+      HOST: "0.0.0.0"
+      LOCAL_USER_TOKENS: "${LOCAL_USER_TOKENS:-usr_dev:dev-token}"
+      WORKSPACE_ROOT: /app/data
+      LOG_LEVEL: "info"
+    volumes:
+      - ../data:/app/data
+      - ../skills:/app/skills
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ../
+      dockerfile: tooling/web.Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_RUNTIME_URL: http://bot-runtime:4000
+      NEXT_PUBLIC_BEARER: "${DEV_BEARER:-dev-token}"
+    depends_on:
+      - bot-runtime
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.2.2
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ../ops/grafana:/etc/grafana/provisioning/dashboards
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+volumes:
+  grafana-data: {}
