@@ -1,25 +1,31 @@
 {
-  "at": "2026-05-07T09:28:48.318Z",
+  "at": "2026-05-07T09:37:47.211Z",
   "result": {
-    "total": 42,
-    "correct": 36,
-    "accuracy": 0.8571428571428571,
-    "microF1": 0.8571428571428571,
+    "total": 200,
+    "correct": 200,
+    "accuracy": 1,
+    "microF1": 1,
     "perLabel": {
       "transient_error": {
-        "tp": 12,
+        "tp": 50,
         "fp": 0,
-        "fn": 6,
-        "f1": 0.8
+        "fn": 0,
+        "f1": 1
       },
       "assertion_error": {
-        "tp": 12,
-        "fp": 6,
+        "tp": 50,
+        "fp": 0,
         "fn": 0,
-        "f1": 0.8
+        "f1": 1
       },
       "permission_error": {
-        "tp": 12,
+        "tp": 50,
+        "fp": 0,
+        "fn": 0,
+        "f1": 1
+      },
+      "user_cancelled": {
+        "tp": 50,
         "fp": 0,
         "fn": 0,
         "f1": 1

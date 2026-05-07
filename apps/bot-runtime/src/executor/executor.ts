@@ -312,11 +312,37 @@ export class Executor {
 }
 
 export function classifyToolError(message: string): string {
+  // user_cancelled MUST be checked first so it doesn't fall into transient
+  // (SIGINT/abort/timeout-ish phrasing) or permission (denied-ish phrasing).
+  if (
+    /\buser[\s_-]?cancel(?:l)?ed\b/i.test(message) ||
+    /\bcancel(?:l)?ed by user\b/i.test(message) ||
+    /\bSIGINT\b/.test(message) ||
+    /\baborted by (?:user|operator)\b/i.test(message) ||
+    /\bmanually (?:stopped|aborted|killed)\b/i.test(message) ||
+    /\bclient[\s_-]?cancel(?:l)?ed\b/i.test(message) ||
+    /\boperator killed\b/i.test(message) ||
+    /\bowner cancelled\b/i.test(message) ||
+    /\buser_cancelled\b/i.test(message) ||
+    /\bpressed Ctrl-?C\b/i.test(message) ||
+    /\bcancel(?:l)?ed mid-tool\b/i.test(message) ||
+    /\/cancel issued by\b/i.test(message)
+  ) {
+    return 'user_cancelled';
+  }
   if (message.startsWith('permission_error:')) return 'permission_error';
-  if (/timeout|ENETUNREACH|EAI_AGAIN|503|504|connection reset/i.test(message)) {
+  if (
+    /timed? ?out|ETIMEDOUT|ECONNRESET|ECONNREFUSED|ENETUNREACH|EHOSTUNREACH|EAI_AGAIN|EAI_NONAME|EPIPE|EAGAIN|EBUSY|502|503|504|429|connection reset|stream reset|socket hang up|gateway timeout|bad gateway|service unavailable|rate limited|too many requests|getaddrinfo|dns resolution|temporary failure in name resolution|temporarily unavailable|upstream timeout|network is unreachable|provisionedthroughputexceeded|deadline_exceeded|backoff|slowdown|backenderror/i.test(
+      message,
+    )
+  ) {
     return 'transient_error';
   }
-  if (/permission|forbidden|access denied/i.test(message)) {
+  if (
+    /permission|forbidden|access denied|EACCES|EPERM|not[_\s-]?owner|not the task owner|unauthorized|token expired|api key revoked|auth failed|insufficient privileges|insufficient scope|sandbox|path traversal|escape root|cannot write outside|operation not permitted|401|403|RBAC|cross-tenant|signed url expired|jwt|hmac mismatch|client cert|membership required/i.test(
+      message,
+    )
+  ) {
     return 'permission_error';
   }
   return 'assertion_error';

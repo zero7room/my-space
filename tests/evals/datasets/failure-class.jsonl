@@ -1,42 +1,200 @@
-{"id":"fc-0-0","input":{"message":"ETIMEDOUT upstream socket"},"label":"transient_error"}
-{"id":"fc-0-1","input":{"message":"ECONNRESET reading response"},"label":"transient_error"}
-{"id":"fc-0-2","input":{"message":"503 Service Unavailable"},"label":"transient_error"}
-{"id":"fc-0-3","input":{"message":"504 Gateway Timeout"},"label":"transient_error"}
-{"id":"fc-0-4","input":{"message":"EAI_AGAIN dns lookup"},"label":"transient_error"}
-{"id":"fc-0-5","input":{"message":"connection reset by peer"},"label":"transient_error"}
-{"id":"fc-0-6","input":{"message":"assertion failed: expected 3 got 2"},"label":"assertion_error"}
-{"id":"fc-0-7","input":{"message":"test expectation mismatch"},"label":"assertion_error"}
-{"id":"fc-0-8","input":{"message":"invariant violated: state missing"},"label":"assertion_error"}
-{"id":"fc-0-9","input":{"message":"permission denied writing file"},"label":"permission_error"}
-{"id":"fc-0-10","input":{"message":"forbidden: not owner"},"label":"permission_error"}
-{"id":"fc-0-11","input":{"message":"access denied to /etc/passwd"},"label":"permission_error"}
-{"id":"fc-0-12","input":{"message":"permission_error: tool tried to escape root"},"label":"permission_error"}
-{"id":"fc-0-13","input":{"message":"user cancelled by signal"},"label":"user_cancelled"}
-{"id":"fc-1-0","input":{"message":"ETIMEDOUT upstream socket"},"label":"transient_error"}
-{"id":"fc-1-1","input":{"message":"ECONNRESET reading response"},"label":"transient_error"}
-{"id":"fc-1-2","input":{"message":"503 Service Unavailable"},"label":"transient_error"}
-{"id":"fc-1-3","input":{"message":"504 Gateway Timeout"},"label":"transient_error"}
-{"id":"fc-1-4","input":{"message":"EAI_AGAIN dns lookup"},"label":"transient_error"}
-{"id":"fc-1-5","input":{"message":"connection reset by peer"},"label":"transient_error"}
-{"id":"fc-1-6","input":{"message":"assertion failed: expected 3 got 2"},"label":"assertion_error"}
-{"id":"fc-1-7","input":{"message":"test expectation mismatch"},"label":"assertion_error"}
-{"id":"fc-1-8","input":{"message":"invariant violated: state missing"},"label":"assertion_error"}
-{"id":"fc-1-9","input":{"message":"permission denied writing file"},"label":"permission_error"}
-{"id":"fc-1-10","input":{"message":"forbidden: not owner"},"label":"permission_error"}
-{"id":"fc-1-11","input":{"message":"access denied to /etc/passwd"},"label":"permission_error"}
-{"id":"fc-1-12","input":{"message":"permission_error: tool tried to escape root"},"label":"permission_error"}
-{"id":"fc-1-13","input":{"message":"user cancelled by signal"},"label":"user_cancelled"}
-{"id":"fc-2-0","input":{"message":"ETIMEDOUT upstream socket"},"label":"transient_error"}
-{"id":"fc-2-1","input":{"message":"ECONNRESET reading response"},"label":"transient_error"}
-{"id":"fc-2-2","input":{"message":"503 Service Unavailable"},"label":"transient_error"}
-{"id":"fc-2-3","input":{"message":"504 Gateway Timeout"},"label":"transient_error"}
-{"id":"fc-2-4","input":{"message":"EAI_AGAIN dns lookup"},"label":"transient_error"}
-{"id":"fc-2-5","input":{"message":"connection reset by peer"},"label":"transient_error"}
-{"id":"fc-2-6","input":{"message":"assertion failed: expected 3 got 2"},"label":"assertion_error"}
-{"id":"fc-2-7","input":{"message":"test expectation mismatch"},"label":"assertion_error"}
-{"id":"fc-2-8","input":{"message":"invariant violated: state missing"},"label":"assertion_error"}
-{"id":"fc-2-9","input":{"message":"permission denied writing file"},"label":"permission_error"}
-{"id":"fc-2-10","input":{"message":"forbidden: not owner"},"label":"permission_error"}
-{"id":"fc-2-11","input":{"message":"access denied to /etc/passwd"},"label":"permission_error"}
-{"id":"fc-2-12","input":{"message":"permission_error: tool tried to escape root"},"label":"permission_error"}
-{"id":"fc-2-13","input":{"message":"user cancelled by signal"},"label":"user_cancelled"}
+{"id":"fc-0","input":{"message":"ETIMEDOUT connecting to api.example.com:443"},"label":"transient_error"}
+{"id":"fc-1","input":{"message":"ECONNRESET while reading response body from upstream"},"label":"transient_error"}
+{"id":"fc-2","input":{"message":"ECONNREFUSED 127.0.0.1:5432"},"label":"transient_error"}
+{"id":"fc-3","input":{"message":"EAI_AGAIN getaddrinfo retry on api.stripe.com"},"label":"transient_error"}
+{"id":"fc-4","input":{"message":"EPIPE write after end of stream"},"label":"transient_error"}
+{"id":"fc-5","input":{"message":"EHOSTUNREACH no route to host 10.0.5.42"},"label":"transient_error"}
+{"id":"fc-6","input":{"message":"connection reset by peer (request_id=req_8a2f)"},"label":"transient_error"}
+{"id":"fc-7","input":{"message":"socket hang up during streaming response"},"label":"transient_error"}
+{"id":"fc-8","input":{"message":"upstream timeout after 30s waiting for downstream service"},"label":"transient_error"}
+{"id":"fc-9","input":{"message":"HTTP 502 Bad Gateway from cloudfront edge node IAD12"},"label":"transient_error"}
+{"id":"fc-10","input":{"message":"HTTP 503 Service Unavailable, retry-after: 5"},"label":"transient_error"}
+{"id":"fc-11","input":{"message":"HTTP 504 Gateway Timeout from nginx (request 7c1f2)"},"label":"transient_error"}
+{"id":"fc-12","input":{"message":"Gateway Timeout while contacting tasks service"},"label":"transient_error"}
+{"id":"fc-13","input":{"message":"Bad Gateway response from upstream load balancer"},"label":"transient_error"}
+{"id":"fc-14","input":{"message":"Service Unavailable: redis cluster degraded"},"label":"transient_error"}
+{"id":"fc-15","input":{"message":"429 Too Many Requests, retry-after 30s"},"label":"transient_error"}
+{"id":"fc-16","input":{"message":"rate limited by openai (retry-after 12s)"},"label":"transient_error"}
+{"id":"fc-17","input":{"message":"rate limited (retry-after 30s) on POST /v1/messages"},"label":"transient_error"}
+{"id":"fc-18","input":{"message":"getaddrinfo failed for host queue.internal"},"label":"transient_error"}
+{"id":"fc-19","input":{"message":"EAI_NONAME with retry scheduled in 2s"},"label":"transient_error"}
+{"id":"fc-20","input":{"message":"DNS resolution failed temporarily for db.cluster.local"},"label":"transient_error"}
+{"id":"fc-21","input":{"message":"Resource temporarily unavailable (errno=11)"},"label":"transient_error"}
+{"id":"fc-22","input":{"message":"EAGAIN: try again on accept()"},"label":"transient_error"}
+{"id":"fc-23","input":{"message":"EBUSY: device or resource busy /var/run/mq.sock"},"label":"transient_error"}
+{"id":"fc-24","input":{"message":"request to https://api.foo.io timed out after 15000ms"},"label":"transient_error"}
+{"id":"fc-25","input":{"message":"fetch failed: ETIMEDOUT api.notion.com"},"label":"transient_error"}
+{"id":"fc-26","input":{"message":"WebSocket disconnected: connection reset"},"label":"transient_error"}
+{"id":"fc-27","input":{"message":"pgsql: connection reset during query"},"label":"transient_error"}
+{"id":"fc-28","input":{"message":"kafka producer: ECONNREFUSED to broker-2:9092"},"label":"transient_error"}
+{"id":"fc-29","input":{"message":"redis: ETIMEDOUT after 5000ms"},"label":"transient_error"}
+{"id":"fc-30","input":{"message":"http2 stream reset NO_ERROR (likely transient)"},"label":"transient_error"}
+{"id":"fc-31","input":{"message":"TLS handshake timeout to vault.internal"},"label":"transient_error"}
+{"id":"fc-32","input":{"message":"Network is unreachable (errno=51)"},"label":"transient_error"}
+{"id":"fc-33","input":{"message":"connect ECONNREFUSED 169.254.169.254:80 (metadata service)"},"label":"transient_error"}
+{"id":"fc-34","input":{"message":"503 from gateway: upstream connect error"},"label":"transient_error"}
+{"id":"fc-35","input":{"message":"temporary failure in name resolution"},"label":"transient_error"}
+{"id":"fc-36","input":{"message":"bigquery jobs.insert: 503 backendError, retry suggested"},"label":"transient_error"}
+{"id":"fc-37","input":{"message":"s3 PutObject: 503 SlowDown"},"label":"transient_error"}
+{"id":"fc-38","input":{"message":"dynamodb ProvisionedThroughputExceeded; retry with backoff"},"label":"transient_error"}
+{"id":"fc-39","input":{"message":"429 too many requests on graphql endpoint"},"label":"transient_error"}
+{"id":"fc-40","input":{"message":"gateway timeout reading from queue (req_id=abc123)"},"label":"transient_error"}
+{"id":"fc-41","input":{"message":"pubsub publish: DEADLINE_EXCEEDED"},"label":"transient_error"}
+{"id":"fc-42","input":{"message":"grpc DEADLINE_EXCEEDED contacting worker-3"},"label":"transient_error"}
+{"id":"fc-43","input":{"message":"connection reset while reading 1024 bytes from socket"},"label":"transient_error"}
+{"id":"fc-44","input":{"message":"Etimedout: socket inactive for 60000ms"},"label":"transient_error"}
+{"id":"fc-45","input":{"message":"NetworkError: socket hang up during PUT /upload"},"label":"transient_error"}
+{"id":"fc-46","input":{"message":"transient http 504 from worker pool, request will be retried"},"label":"transient_error"}
+{"id":"fc-47","input":{"message":"getaddrinfo EAI_AGAIN gitlab.example.org:443"},"label":"transient_error"}
+{"id":"fc-48","input":{"message":"EPIPE writing to closed stream during chunked upload"},"label":"transient_error"}
+{"id":"fc-49","input":{"message":"rate limited: 429, X-RateLimit-Reset=1714902000"},"label":"transient_error"}
+{"id":"fc-50","input":{"message":"AssertionError: expected 5 to equal 7 at field totals.count"},"label":"assertion_error"}
+{"id":"fc-51","input":{"message":"expect(result).toBe(\"ok\") failed; received \"pending\""},"label":"assertion_error"}
+{"id":"fc-52","input":{"message":"AssertionError: expected array of length 3 to have length 4"},"label":"assertion_error"}
+{"id":"fc-53","input":{"message":"AssertionError: deepEqual mismatch on key \"status\""},"label":"assertion_error"}
+{"id":"fc-54","input":{"message":"test expectation mismatch on field foo: expected \"bar\", got \"baz\""},"label":"assertion_error"}
+{"id":"fc-55","input":{"message":"invariant violated: snapshot ordering not monotonic"},"label":"assertion_error"}
+{"id":"fc-56","input":{"message":"invariant violated: task.id changed mid-run"},"label":"assertion_error"}
+{"id":"fc-57","input":{"message":"state machine illegal transition: queued -> completed"},"label":"assertion_error"}
+{"id":"fc-58","input":{"message":"state machine illegal transition: failed -> running"},"label":"assertion_error"}
+{"id":"fc-59","input":{"message":"contract guard failed: pre-condition !task.archived"},"label":"assertion_error"}
+{"id":"fc-60","input":{"message":"contract guard failed: post-condition events.length > 0"},"label":"assertion_error"}
+{"id":"fc-61","input":{"message":"ZodError: invalid_type at path body.userId, expected string got number"},"label":"assertion_error"}
+{"id":"fc-62","input":{"message":"ZodError: too_small at path payload.items, must contain at least 1"},"label":"assertion_error"}
+{"id":"fc-63","input":{"message":"ZodError: invalid_enum_value at path config.mode"},"label":"assertion_error"}
+{"id":"fc-64","input":{"message":"schema validation failed: extra unknown property \"frobnicate\""},"label":"assertion_error"}
+{"id":"fc-65","input":{"message":"JSON schema mismatch: expected object, got array (at \"tasks\")"},"label":"assertion_error"}
+{"id":"fc-66","input":{"message":"JSON schema mismatch: required property \"id\" missing"},"label":"assertion_error"}
+{"id":"fc-67","input":{"message":"checksum mismatch: expected sha256:aa..bb got sha256:cc..dd"},"label":"assertion_error"}
+{"id":"fc-68","input":{"message":"expected 3 items, got 2 in plan.steps"},"label":"assertion_error"}
+{"id":"fc-69","input":{"message":"AssertionError: timestamps must be ISO-8601, got \"2026/05/07\""},"label":"assertion_error"}
+{"id":"fc-70","input":{"message":"expect(...).toEqual(...) failed: object diff at path .meta.version"},"label":"assertion_error"}
+{"id":"fc-71","input":{"message":"AssertionError: predicate isFinalised() returned false"},"label":"assertion_error"}
+{"id":"fc-72","input":{"message":"invariant: critical_node policy must be present, was undefined"},"label":"assertion_error"}
+{"id":"fc-73","input":{"message":"AssertionError: receiver.length === 1, was 0"},"label":"assertion_error"}
+{"id":"fc-74","input":{"message":"expect(emitted).toContain(\"task_completed\") failed"},"label":"assertion_error"}
+{"id":"fc-75","input":{"message":"state machine illegal transition: blocked -> running without resume"},"label":"assertion_error"}
+{"id":"fc-76","input":{"message":"invariant violated: idempotency key reused with different body"},"label":"assertion_error"}
+{"id":"fc-77","input":{"message":"contract guard failed: thread.lastEventTs is older than task.startedAt"},"label":"assertion_error"}
+{"id":"fc-78","input":{"message":"AssertionError: response.body should not be null"},"label":"assertion_error"}
+{"id":"fc-79","input":{"message":"JSON schema mismatch: type=number required, received string \"12\""},"label":"assertion_error"}
+{"id":"fc-80","input":{"message":"AssertionError: planVersion must be > previousVersion"},"label":"assertion_error"}
+{"id":"fc-81","input":{"message":"invariant violated: applyTaskTransition called twice with same target"},"label":"assertion_error"}
+{"id":"fc-82","input":{"message":"AssertionError: heuristic.flaky === false; was true"},"label":"assertion_error"}
+{"id":"fc-83","input":{"message":"expected exactly one critical node match, found 3"},"label":"assertion_error"}
+{"id":"fc-84","input":{"message":"ZodError: invalid_string regex at path payload.url"},"label":"assertion_error"}
+{"id":"fc-85","input":{"message":"schema validation failed: pattern mismatch on threadId"},"label":"assertion_error"}
+{"id":"fc-86","input":{"message":"AssertionError: expected status \"completed\", actual \"failed\""},"label":"assertion_error"}
+{"id":"fc-87","input":{"message":"invariant violated: events appended out of order"},"label":"assertion_error"}
+{"id":"fc-88","input":{"message":"state machine illegal transition: cancelled -> queued"},"label":"assertion_error"}
+{"id":"fc-89","input":{"message":"contract guard failed: must hold lock on task before update"},"label":"assertion_error"}
+{"id":"fc-90","input":{"message":"AssertionError: predicate isMonotonic([1,3,2]) returned false"},"label":"assertion_error"}
+{"id":"fc-91","input":{"message":"expect(spy).toHaveBeenCalledWith({id: \"x\"}) failed (received {id: \"y\"})"},"label":"assertion_error"}
+{"id":"fc-92","input":{"message":"AssertionError: cardinality mismatch — expected 1, got many"},"label":"assertion_error"}
+{"id":"fc-93","input":{"message":"invariant: tool_call_started without tool_call_completed within 60s"},"label":"assertion_error"}
+{"id":"fc-94","input":{"message":"JSON schema mismatch at /payload/items/0: missing \"kind\""},"label":"assertion_error"}
+{"id":"fc-95","input":{"message":"ZodError: unrecognized_keys: [\"debugInternal\"]"},"label":"assertion_error"}
+{"id":"fc-96","input":{"message":"AssertionError: text encoding must be utf-8, was latin1"},"label":"assertion_error"}
+{"id":"fc-97","input":{"message":"contract guard failed: invariant on retry budget exceeded"},"label":"assertion_error"}
+{"id":"fc-98","input":{"message":"expected snapshot to match: diff at line 12"},"label":"assertion_error"}
+{"id":"fc-99","input":{"message":"AssertionError: graph contains cycle through node A->B->A"},"label":"assertion_error"}
+{"id":"fc-100","input":{"message":"EACCES: permission denied, open /etc/shadow"},"label":"permission_error"}
+{"id":"fc-101","input":{"message":"EACCES: permission denied writing /var/secrets/.token"},"label":"permission_error"}
+{"id":"fc-102","input":{"message":"EPERM operation not permitted: chown /workspace/state.json"},"label":"permission_error"}
+{"id":"fc-103","input":{"message":"EPERM operation not permitted on /proc/1/cmdline"},"label":"permission_error"}
+{"id":"fc-104","input":{"message":"access denied to /etc/ssh/sshd_config"},"label":"permission_error"}
+{"id":"fc-105","input":{"message":"access denied to s3://internal/finance/2024.csv"},"label":"permission_error"}
+{"id":"fc-106","input":{"message":"cannot write outside workspace: /tmp/escape/file.txt"},"label":"permission_error"}
+{"id":"fc-107","input":{"message":"cannot write outside workspace root /home/runner/work"},"label":"permission_error"}
+{"id":"fc-108","input":{"message":"403 Forbidden GET https://api.example.com/admin"},"label":"permission_error"}
+{"id":"fc-109","input":{"message":"403 Forbidden: insufficient scope for repos:admin"},"label":"permission_error"}
+{"id":"fc-110","input":{"message":"not_owner: user u_42 cannot modify task owned by u_99"},"label":"permission_error"}
+{"id":"fc-111","input":{"message":"not_owner of thread t_abc; refuse update"},"label":"permission_error"}
+{"id":"fc-112","input":{"message":"user u_17 is not the task owner; cannot cancel"},"label":"permission_error"}
+{"id":"fc-113","input":{"message":"insufficient privileges: requires role:admin"},"label":"permission_error"}
+{"id":"fc-114","input":{"message":"insufficient privileges to call tools.write"},"label":"permission_error"}
+{"id":"fc-115","input":{"message":"401 Unauthorized: missing bearer token"},"label":"permission_error"}
+{"id":"fc-116","input":{"message":"401 Unauthorized: signature verification failed"},"label":"permission_error"}
+{"id":"fc-117","input":{"message":"token expired at 2026-05-07T12:00:00Z"},"label":"permission_error"}
+{"id":"fc-118","input":{"message":"token expired; refresh required"},"label":"permission_error"}
+{"id":"fc-119","input":{"message":"API key revoked (key_id=ak_88f1)"},"label":"permission_error"}
+{"id":"fc-120","input":{"message":"API key revoked by admin at 2026-05-06"},"label":"permission_error"}
+{"id":"fc-121","input":{"message":"auth failed: invalid client_secret"},"label":"permission_error"}
+{"id":"fc-122","input":{"message":"auth failed: hmac mismatch on webhook payload"},"label":"permission_error"}
+{"id":"fc-123","input":{"message":"tool tried to escape root /workspace via ../../etc"},"label":"permission_error"}
+{"id":"fc-124","input":{"message":"path traversal blocked: argument resolved outside sandbox"},"label":"permission_error"}
+{"id":"fc-125","input":{"message":"denied by sandbox: net.connect to 169.254.169.254"},"label":"permission_error"}
+{"id":"fc-126","input":{"message":"denied by sandbox policy: shell exec disallowed"},"label":"permission_error"}
+{"id":"fc-127","input":{"message":"permission_error: refusing to read /etc/passwd"},"label":"permission_error"}
+{"id":"fc-128","input":{"message":"permission_error: write to read-only mount /opt/app"},"label":"permission_error"}
+{"id":"fc-129","input":{"message":"forbidden: cross-tenant access attempted (tenant_a -> tenant_b)"},"label":"permission_error"}
+{"id":"fc-130","input":{"message":"EACCES on stat /root/.ssh/id_rsa"},"label":"permission_error"}
+{"id":"fc-131","input":{"message":"EPERM unlink /usr/local/bin/node"},"label":"permission_error"}
+{"id":"fc-132","input":{"message":"access denied: signed URL expired"},"label":"permission_error"}
+{"id":"fc-133","input":{"message":"403 Forbidden by IAM policy on bucket finance-prod"},"label":"permission_error"}
+{"id":"fc-134","input":{"message":"401 Unauthorized: jwt aud mismatch"},"label":"permission_error"}
+{"id":"fc-135","input":{"message":"token expired during long-running tool call"},"label":"permission_error"}
+{"id":"fc-136","input":{"message":"API key revoked: rotated 2 days ago"},"label":"permission_error"}
+{"id":"fc-137","input":{"message":"auth failed: client cert invalid"},"label":"permission_error"}
+{"id":"fc-138","input":{"message":"sandbox denied: filesystem write to /etc"},"label":"permission_error"}
+{"id":"fc-139","input":{"message":"sandbox blocked path traversal at ../secrets"},"label":"permission_error"}
+{"id":"fc-140","input":{"message":"cannot write outside workspace; attempted /var/log/app.log"},"label":"permission_error"}
+{"id":"fc-141","input":{"message":"not_owner: caller is observer, write requires owner role"},"label":"permission_error"}
+{"id":"fc-142","input":{"message":"insufficient privileges: scope=read-only"},"label":"permission_error"}
+{"id":"fc-143","input":{"message":"403 Forbidden: project membership required"},"label":"permission_error"}
+{"id":"fc-144","input":{"message":"EACCES: permission denied creating dir /opt/data"},"label":"permission_error"}
+{"id":"fc-145","input":{"message":"permission_error: refused to delete protected file"},"label":"permission_error"}
+{"id":"fc-146","input":{"message":"forbidden by RBAC: action=delete resource=task/123"},"label":"permission_error"}
+{"id":"fc-147","input":{"message":"401 from auth.example.com: token signature invalid"},"label":"permission_error"}
+{"id":"fc-148","input":{"message":"denied by sandbox: subprocess fork disallowed"},"label":"permission_error"}
+{"id":"fc-149","input":{"message":"access denied: per-thread acl rejects user u_55"},"label":"permission_error"}
+{"id":"fc-150","input":{"message":"user cancelled by signal"},"label":"user_cancelled"}
+{"id":"fc-151","input":{"message":"user cancelled the task at 2026-05-07T11:32:01Z"},"label":"user_cancelled"}
+{"id":"fc-152","input":{"message":"SIGINT received during tool dispatch"},"label":"user_cancelled"}
+{"id":"fc-153","input":{"message":"SIGINT received; aborting tool call cleanly"},"label":"user_cancelled"}
+{"id":"fc-154","input":{"message":"cancelled by user (uid=u_42)"},"label":"user_cancelled"}
+{"id":"fc-155","input":{"message":"cancelled by user mid-stream"},"label":"user_cancelled"}
+{"id":"fc-156","input":{"message":"user_cancelled flag set on task t_88c"},"label":"user_cancelled"}
+{"id":"fc-157","input":{"message":"user_cancelled: explicit cancel button clicked"},"label":"user_cancelled"}
+{"id":"fc-158","input":{"message":"aborted by user before completion"},"label":"user_cancelled"}
+{"id":"fc-159","input":{"message":"aborted by user — tool exec halted"},"label":"user_cancelled"}
+{"id":"fc-160","input":{"message":"aborted by operator at 2026-05-07T09:14:00Z"},"label":"user_cancelled"}
+{"id":"fc-161","input":{"message":"aborted by operator via control plane"},"label":"user_cancelled"}
+{"id":"fc-162","input":{"message":"client cancelled the request (request_id=req_xyz)"},"label":"user_cancelled"}
+{"id":"fc-163","input":{"message":"client cancelled stream after 4s"},"label":"user_cancelled"}
+{"id":"fc-164","input":{"message":"operator killed task t_45a from console"},"label":"user_cancelled"}
+{"id":"fc-165","input":{"message":"operator killed long-running tool"},"label":"user_cancelled"}
+{"id":"fc-166","input":{"message":"manually stopped by user from UI"},"label":"user_cancelled"}
+{"id":"fc-167","input":{"message":"manually aborted by ops engineer"},"label":"user_cancelled"}
+{"id":"fc-168","input":{"message":"manually killed via SIGTERM after user request"},"label":"user_cancelled"}
+{"id":"fc-169","input":{"message":"POST /tasks/t_001/cancel issued by user u_7"},"label":"user_cancelled"}
+{"id":"fc-170","input":{"message":"POST /tasks/t_222/cancel issued by user u_admin at 2026-05-07T10:01Z"},"label":"user_cancelled"}
+{"id":"fc-171","input":{"message":"owner cancelled the task at 2026-05-06T22:11:00Z"},"label":"user_cancelled"}
+{"id":"fc-172","input":{"message":"owner cancelled the task; reason: scope changed"},"label":"user_cancelled"}
+{"id":"fc-173","input":{"message":"user pressed Ctrl-C during streaming output"},"label":"user_cancelled"}
+{"id":"fc-174","input":{"message":"user pressed Ctrl-C in the terminal"},"label":"user_cancelled"}
+{"id":"fc-175","input":{"message":"task cancelled mid-tool by user request"},"label":"user_cancelled"}
+{"id":"fc-176","input":{"message":"task cancelled mid-tool; partial output discarded"},"label":"user_cancelled"}
+{"id":"fc-177","input":{"message":"user_cancelled (source=web_ui)"},"label":"user_cancelled"}
+{"id":"fc-178","input":{"message":"user_cancelled (source=cli)"},"label":"user_cancelled"}
+{"id":"fc-179","input":{"message":"cancelled by user via slash command /cancel"},"label":"user_cancelled"}
+{"id":"fc-180","input":{"message":"cancelled by user via API DELETE /tasks/t_9"},"label":"user_cancelled"}
+{"id":"fc-181","input":{"message":"aborted by user; no retry will be scheduled"},"label":"user_cancelled"}
+{"id":"fc-182","input":{"message":"client_cancelled: SSE stream closed by client"},"label":"user_cancelled"}
+{"id":"fc-183","input":{"message":"client-cancelled: dropping in-flight tool call"},"label":"user_cancelled"}
+{"id":"fc-184","input":{"message":"user-cancelled: thread closed in UI"},"label":"user_cancelled"}
+{"id":"fc-185","input":{"message":"SIGINT propagated from parent process; treating as cancel"},"label":"user_cancelled"}
+{"id":"fc-186","input":{"message":"SIGINT trapped: user_cancelled emitted"},"label":"user_cancelled"}
+{"id":"fc-187","input":{"message":"cancelled by user; cleanup done"},"label":"user_cancelled"}
+{"id":"fc-188","input":{"message":"cancelled by user before any tool dispatched"},"label":"user_cancelled"}
+{"id":"fc-189","input":{"message":"manually stopped via /cancel issued by user u_3"},"label":"user_cancelled"}
+{"id":"fc-190","input":{"message":"/cancel issued by user u_admin (override=true)"},"label":"user_cancelled"}
+{"id":"fc-191","input":{"message":"user pressed Ctrl-C; SIGINT delivered"},"label":"user_cancelled"}
+{"id":"fc-192","input":{"message":"aborted by operator after escalation"},"label":"user_cancelled"}
+{"id":"fc-193","input":{"message":"owner cancelled the task at 2026-05-04T08:00:00Z; ticket closed"},"label":"user_cancelled"}
+{"id":"fc-194","input":{"message":"user cancelled (no reason given)"},"label":"user_cancelled"}
+{"id":"fc-195","input":{"message":"user-cancelled mid-flight tool call to bash"},"label":"user_cancelled"}
+{"id":"fc-196","input":{"message":"cancelled by user immediately after queuing"},"label":"user_cancelled"}
+{"id":"fc-197","input":{"message":"task cancelled mid-tool while writing artifact"},"label":"user_cancelled"}
+{"id":"fc-198","input":{"message":"user_cancelled flag set; executor exiting cleanly"},"label":"user_cancelled"}
+{"id":"fc-199","input":{"message":"POST /tasks/t_77/cancel issued by user owner@example.com"},"label":"user_cancelled"}
