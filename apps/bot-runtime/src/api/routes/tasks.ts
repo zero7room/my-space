@@ -361,17 +361,35 @@ export function registerTaskRoutes(app: FastifyInstance, deps: Deps): void {
         h.threadId,
         h.task.id,
       );
+      // Acceptance 52: surface the full retry chain — all 7 retry-related
+      // event kinds so the UI can show every transition (manual, automatic,
+      // skipped, classification warnings, plan_update resets, archives).
+      const RETRY_KINDS = new Set([
+        'task_retry_scheduled',
+        'task_retry_started',
+        'task_retry_exhausted',
+        'task_retry_skipped',
+        'task_retry_classification_warning',
+        'task_manual_retry_requested',
+        'task_retry_reset_by_plan_update',
+        'events_jsonl_rotated',
+      ]);
       const entries = events
-        .filter((e) =>
-          ['task_retry_scheduled', 'task_retry_started', 'task_retry_exhausted', 'task_manual_retry_requested'].includes(
-            e.kind,
-          ),
-        )
+        .filter((e) => RETRY_KINDS.has(e.kind))
         .map((e) => ({
           eventId: e.id,
+          kind: e.kind,
           at: e.at,
           attemptCount: (e.payload['attemptCount'] as number) ?? 0,
           failureClass: e.payload['failureClass'] as string | undefined,
+          failureReason: (e.payload['failureReason'] as string) ?? undefined,
+          nextRetryAt: e.payload['nextRetryAt'] as string | undefined,
+          triggeredBy:
+            e.kind === 'task_manual_retry_requested'
+              ? 'user'
+              : e.kind === 'task_retry_reset_by_plan_update'
+                ? 'plan_update'
+                : 'master',
           summary: (e.payload['summary'] as string) ?? '',
         }));
       return { taskId: h.task.id, entries };

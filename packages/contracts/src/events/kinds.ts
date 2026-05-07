@@ -24,6 +24,8 @@ export const TASK_EVENT_KINDS = [
   'task_retry_scheduled',
   'task_retry_started',
   'task_retry_exhausted',
+  'task_retry_skipped',
+  'task_retry_classification_warning',
   'task_manual_retry_requested',
   'task_retry_reset_by_plan_update',
   'task_list_repair',
@@ -100,6 +102,9 @@ export const CHANNEL_EVENT_KINDS = [
   'channel_outbound_failed',
   'channel_outbound_dead',
   'channel_notify_throttled',
+  'inbound_duplicate',
+  'notify_throttled',
+  'lastFailureReason_redacted',
 ] as const;
 export type ChannelEventKind = (typeof CHANNEL_EVENT_KINDS)[number];
 

@@ -150,12 +150,37 @@ export function registerChannelRoutes(
       return reply.code(401).send({ error: { code: 'unauthorized' } });
     }
     if (out.event) {
-      // Idempotency: first-write-wins via repo.
+      // Idempotency: first-write-wins via repo. Acceptance 53: emit
+      // `inbound_duplicate` when the same (provider, eventId) is seen again so
+      // operators can spot replay storms; counter is bumped via metrics.
       const existing = await deps.rt.channelEvents.get(
         out.event.provider,
         out.event.externalEventId,
       );
-      if (!existing) {
+      if (existing) {
+        try {
+          const fsm = await import('node:fs/promises');
+          const path = await import('node:path');
+          const dir = path.join(deps.rt.paths.diagnosticsRoot(), 'inbound-duplicates');
+          await fsm.mkdir(dir, { recursive: true });
+          const file = path.join(
+            dir,
+            `${out.event.provider}-${out.event.externalEventId}.jsonl`,
+          );
+          await fsm.appendFile(
+            file,
+            JSON.stringify({
+              kind: 'inbound_duplicate',
+              providerId: out.event.provider,
+              eventId: out.event.externalEventId,
+              originalProcessedAt: existing.createdAt,
+              at: new Date().toISOString(),
+            }) + '\n',
+          );
+        } catch {
+          /* best-effort diagnostic write */
+        }
+      } else {
         await deps.rt.channelEvents.record(out.event);
       }
     }

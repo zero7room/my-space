@@ -19,6 +19,7 @@ import {
   type Task,
   type TaskRetryState,
   applyTaskTransition,
+  sanitizeWithReport,
 } from '@ai-workflow/contracts';
 
 import type { RuntimePaths } from '../runtime/paths.js';
@@ -54,11 +55,34 @@ export class RetryScheduler {
         retry: input.task.retry ?? { attemptCount: 0, maxRetries: 2 },
       };
     }
+    // Acceptance 45: PII-redact failureReason before persisting to disk /
+    // events.jsonl. Truncate to 16KB to bound storage; emit a redaction event
+    // when sanitizer matched anything so audit can correlate.
+    const MAX_REASON_BYTES = 16 * 1024;
+    let failureReason = input.failureReason ?? '';
+    if (Buffer.byteLength(failureReason, 'utf8') > MAX_REASON_BYTES) {
+      failureReason = failureReason.slice(0, MAX_REASON_BYTES);
+    }
+    const sanitized = sanitizeWithReport(failureReason);
+    failureReason = sanitized.output;
+    if (sanitized.redactedKinds.length > 0) {
+      await this.rt.tasks.appendEvent(input.threadId, input.task.id, {
+        kind: 'lastFailureReason_redacted',
+        taskId: input.task.id,
+        threadId: input.threadId,
+        payload: {
+          redactedKinds: sanitized.redactedKinds,
+          originalLengthBytes: Buffer.byteLength(input.failureReason ?? '', 'utf8'),
+          redactedLengthBytes: Buffer.byteLength(failureReason, 'utf8'),
+        },
+        at: new Date(this.now()).toISOString(),
+      });
+    }
     if (input.failureClass !== 'transient_error') {
       const r = input.task.retry ?? { attemptCount: 0, maxRetries: 2 };
       return {
         outcome: 'not_eligible',
-        retry: { ...r, failureClass: input.failureClass },
+        retry: { ...r, failureClass: input.failureClass, lastFailureReason: failureReason },
       };
     }
     const cur = input.task.retry ?? { attemptCount: 0, maxRetries: 2 };
@@ -67,7 +91,7 @@ export class RetryScheduler {
         ...cur,
         failureClass: input.failureClass,
         lastFailureAt: new Date(this.now()).toISOString(),
-        lastFailureReason: input.failureReason,
+        lastFailureReason: failureReason,
       };
       const ev = await this.rt.tasks.appendEvent(
         input.threadId,
@@ -110,7 +134,7 @@ export class RetryScheduler {
       attemptCount: cur.attemptCount + 1,
       failureClass: input.failureClass,
       lastFailureAt: new Date(this.now()).toISOString(),
-      lastFailureReason: input.failureReason,
+      lastFailureReason: failureReason,
       nextRetryAt: nextAt,
     };
     const ev = await this.rt.tasks.appendEvent(input.threadId, input.task.id, {
