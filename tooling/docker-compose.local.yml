@@ -8,10 +8,10 @@ services:
     ports:
       - "4000:4000"
     environment:
-      RUNTIME_ID: default
+      RUNTIME_ID: local-dev
       PORT: "4000"
       HOST: "0.0.0.0"
-      LOCAL_USER_TOKENS: "${LOCAL_USER_TOKENS:-usr_dev:dev-token}"
+      LOCAL_USER_TOKENS: "${LOCAL_USER_TOKENS:-usr_dev000000000000000000:dev-token}"
       WORKSPACE_ROOT: /app/data
       LOG_LEVEL: "info"
     volumes:

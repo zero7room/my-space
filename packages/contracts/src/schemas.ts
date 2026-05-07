@@ -97,6 +97,7 @@ export const outboundJobStatusSchema: z.ZodType<OutboundJobState> = z.enum([
 export const teamStatusSchema: z.ZodType<TeamState> = z.enum([
   'forming',
   'active',
+  'paused',
   'finishing',
   'completed',
   'failed',

@@ -242,6 +242,7 @@ export function transitionOutboundJob(
 export type TeamState =
   | 'forming'
   | 'active'
+  | 'paused'
   | 'finishing'
   | 'completed'
   | 'failed'
@@ -249,7 +250,8 @@ export type TeamState =
 
 export const TEAM_TRANSITIONS: Readonly<Record<TeamState, readonly TeamState[]>> = {
   forming: ['active', 'failed', 'cancelled'],
-  active: ['finishing', 'cancelled'],
+  active: ['paused', 'finishing', 'cancelled'],
+  paused: ['active', 'cancelled', 'finishing'],
   finishing: ['completed', 'failed', 'cancelled'],
   completed: [],
   failed: [],

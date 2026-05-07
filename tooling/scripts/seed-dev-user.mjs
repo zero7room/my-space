@@ -16,7 +16,7 @@ import path from 'node:path';
 
 const WS = process.env.WORKSPACE_ROOT ?? process.cwd();
 const RUNTIME_ID = process.env.RUNTIME_ID ?? 'local-dev';
-const USER_ID = process.env.DEV_USER_ID ?? 'usr_dev00000000000000000';
+const USER_ID = process.env.DEV_USER_ID ?? 'usr_dev000000000000000000';
 const USER_NAME = process.env.DEV_USER_NAME ?? 'Dev';
 
 if (!/^usr_[A-Za-z0-9]{21}$/.test(USER_ID)) {

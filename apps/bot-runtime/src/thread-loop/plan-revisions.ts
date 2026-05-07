@@ -30,6 +30,7 @@ import { Transactions } from '@ai-workflow/fs-store';
 
 import type { RuntimePaths } from '../runtime/paths.js';
 import type { SseRegistry } from '../runtime/sse/index.js';
+import { TeamRuntime } from '../teams/team-runtime.js';
 
 export interface PlanRevisionInput {
   threadId: string;
@@ -54,7 +55,6 @@ export class PlanRevisionService {
     task: Task;
     txId: string;
   }> {
-    const ts = this.now();
     // Journal the revise as a single transaction. Ops here are empty: this
     // marker only enables observability — recovery will see prepared/committed
     // and emit transaction_pending_dropped on a crash mid-revise. Individual
@@ -64,8 +64,31 @@ export class PlanRevisionService {
     });
     const txId = await tx.prepare([], []);
     try {
+      // Acceptance 62: any active team(s) attached to this task MUST be
+      // cancelled and reach terminal status BEFORE the new PlanRevision is
+      // recorded — events.jsonl ordering is the user-visible invariant. The
+      // cascade runs first so its `team_cancelled` timestamp is strictly
+      // earlier than `plan_revising` and `task_retry_reset_by_plan_update`.
+      const teams = await this.rt.teams.listTeamsForTask(input.threadId, input.task.id);
+      const activeTeams = teams.filter((t) =>
+        t.status === 'forming' ||
+        t.status === 'active' ||
+        t.status === 'finishing' ||
+        t.status === 'paused',
+      );
+      if (activeTeams.length > 0) {
+        const tr = new TeamRuntime({ rt: this.rt, sse: this.sse, now: this.now });
+        for (const t of activeTeams) {
+          await tr.applyTeamSignal(input.threadId, input.task.id, t.id, 'cancel', input.triggerUserId);
+        }
+        for (const t of activeTeams) {
+          await tr.waitForTeamTerminal(input.threadId, input.task.id, t.id, 30_000);
+        }
+      }
+
       // 1. signal pause — actual executor pause is wired in Phase 6.
       // (We do not emit `executor_paused` here; runtime loop emits.)
+      const ts = this.now();
 
       // 2. plan_revising
       const evRevising = await this.rt.tasks.appendEvent(

@@ -20,6 +20,7 @@ import {
 import type { RuntimePaths } from '../runtime/paths.js';
 import type { SseRegistry } from '../runtime/sse/index.js';
 import type { NotifyThrottle } from '../retry/notify-throttle.js';
+import { TeamRuntime } from '../teams/team-runtime.js';
 
 import { markThreadChattingIfDone } from './thread-state.js';
 
@@ -115,6 +116,9 @@ export class ThreadLoop {
       if (task.status === 'completed' || task.status === 'cancelled') {
         return undefined;
       }
+      // Acceptance 61: cascade cancel to any active team(s) and wait for
+      // terminal status BEFORE the parent task transitions to cancelled.
+      await this.cascadeTeamSignal(threadId, task.id, 'cancel', sig.userId, 'terminal');
       const next = applyTaskTransition(task, 'cancelled', { now });
       next.lastUserSignalAt = now;
       next.lastUserSignalKind = 'cancel';
@@ -142,6 +146,9 @@ export class ThreadLoop {
         task.status === 'running' ||
         task.status === 'awaiting_critical_node'
       ) {
+        // Acceptance 61: cascade pause to active team(s); wait for paused
+        // BEFORE the parent transitions. Teams retain claims on pause.
+        await this.cascadeTeamSignal(threadId, task.id, 'pause', sig.userId, 'paused');
         const next = applyTaskTransition(task, 'paused', { now });
         next.lastUserSignalAt = now;
         next.lastUserSignalKind = 'pause';
@@ -160,6 +167,9 @@ export class ThreadLoop {
     }
     if (sig.kind === 'resume') {
       if (task.status === 'paused') {
+        // Acceptance 61: cascade resume to any paused teams (no wait — they
+        // re-read messages from lastMessageCursor on next tick).
+        await this.cascadeTeamSignal(threadId, task.id, 'resume', sig.userId, 'none');
         const next = applyTaskTransition(task, 'queued', { now });
         next.lastUserSignalAt = now;
         next.lastUserSignalKind = 'resume';
@@ -264,5 +274,46 @@ export class ThreadLoop {
     // unknown signal — ignore
     void newEventId;
     return undefined;
+  }
+
+  /**
+   * Acceptance 61/62 — cascade a control signal to every active team attached
+   * to this task. For cancel: wait for terminal status BEFORE returning so
+   * the parent's `executor_finished{outcome=cancelled}` is appended after
+   * `team_cancelled`. For pause: wait until the team reaches `paused`. For
+   * resume: dispatch only — teammates handle continuation on next tick.
+   */
+  async cascadeTeamSignal(
+    threadId: string,
+    taskId: string,
+    kind: 'cancel' | 'pause' | 'resume',
+    requestedByUserId?: string,
+    waitFor: 'terminal' | 'paused' | 'none' = 'terminal',
+  ): Promise<void> {
+    const teams = await this.deps.rt.teams.listTeamsForTask(threadId, taskId);
+    const targets = teams.filter((t) =>
+      t.status === 'forming' ||
+      t.status === 'active' ||
+      t.status === 'finishing' ||
+      t.status === 'paused',
+    );
+    if (targets.length === 0) return;
+    const tr = new TeamRuntime({ rt: this.deps.rt, sse: this.deps.sse, now: this.deps.now });
+    for (const t of targets) {
+      try {
+        await tr.applyTeamSignal(threadId, taskId, t.id, kind, requestedByUserId);
+      } catch {
+        /* best-effort */
+      }
+    }
+    if (waitFor === 'terminal') {
+      for (const t of targets) {
+        try { await tr.waitForTeamTerminal(threadId, taskId, t.id, 30_000); } catch { /* ignore */ }
+      }
+    } else if (waitFor === 'paused') {
+      for (const t of targets) {
+        try { await tr.waitForTeamPaused(threadId, taskId, t.id, 10_000); } catch { /* ignore */ }
+      }
+    }
   }
 }

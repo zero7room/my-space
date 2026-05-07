@@ -27,6 +27,7 @@ import {
   type TeamSummaryRef,
   type TaskBudget,
   type RiskClass,
+  type TeamState,
   newTeamId,
   newTeammateId,
   newWorkItemId,
@@ -38,6 +39,14 @@ import {
 import type { RuntimePaths } from '../runtime/paths.js';
 import type { SseRegistry } from '../runtime/sse/index.js';
 import type { RuntimeMetrics } from '../metrics/metrics.js';
+
+import {
+  drainTeamControlSignals,
+  pushTeamControlSignal,
+  type TeamControlSignalKind,
+} from './team-control.js';
+
+type TeamStatus = TeamState;
 
 const HARD_TEAM_BUDGET_MAX = {
   maxTeammates: 8,
@@ -381,6 +390,152 @@ export class TeamRuntime {
       throw new TeammateForbiddenError(action);
     }
     void skillRisk;
+  }
+
+  /**
+   * Acceptance 61/62 — apply a control-channel signal to a team. Writes the
+   * signal to control.json AND immediately processes it so the team status
+   * transitions in the same call (graceful: teammates that are mid-tool see
+   * the cancelled/paused status on next tick). Emits team_cancelled,
+   * team_paused, or team_resumed.
+   */
+  async applyTeamSignal(
+    threadId: string,
+    taskId: string,
+    teamId: string,
+    kind: TeamControlSignalKind,
+    requestedByUserId?: string,
+  ): Promise<Team | undefined> {
+    const ts = this.now;
+    await pushTeamControlSignal(this.deps.rt, threadId, taskId, teamId, kind, requestedByUserId);
+    // Drain immediately — waiters poll status, not the control file.
+    await drainTeamControlSignals(this.deps.rt, threadId, taskId, teamId);
+    const team = await this.deps.rt.teams.getTeam(threadId, taskId, teamId);
+    if (!team) return undefined;
+    if (kind === 'cancel') {
+      // Graceful cancel: only transition if not already terminal.
+      if (
+        team.status === 'completed' ||
+        team.status === 'cancelled' ||
+        team.status === 'failed'
+      ) {
+        return team;
+      }
+      const next: Team = { ...team, status: 'cancelled', updatedAt: ts };
+      await this.deps.rt.teams.saveTeam(next);
+      // Cancel teammates (graceful — finish current tool then exit).
+      const teammates = await this.deps.rt.teams.listTeammates(threadId, taskId, teamId);
+      for (const tm of teammates) {
+        if (tm.status === 'finished' || tm.status === 'failed' || tm.status === 'cancelled') {
+          continue;
+        }
+        await this.deps.rt.teams.saveTeammate(threadId, taskId, {
+          ...tm,
+          status: 'cancelled',
+          updatedAt: ts,
+        });
+        await this.emit(threadId, taskId, teamId, 'teammate_cancelled', { teammateId: tm.id });
+      }
+      try {
+        this.deps.metrics?.teamActiveCount.dec();
+      } catch { /* best-effort */ }
+      await this.emit(threadId, taskId, teamId, 'team_cancelled', {
+        requestedByUserId,
+      });
+      return next;
+    }
+    if (kind === 'pause') {
+      if (team.status !== 'active') return team;
+      const next: Team = { ...team, status: 'paused', updatedAt: ts };
+      await this.deps.rt.teams.saveTeam(next);
+      // Pause teammates — keep claims (do NOT release work-items).
+      const teammates = await this.deps.rt.teams.listTeammates(threadId, taskId, teamId);
+      for (const tm of teammates) {
+        if (tm.status === 'working' || tm.status === 'idle') {
+          await this.deps.rt.teams.saveTeammate(threadId, taskId, {
+            ...tm,
+            status: 'paused',
+            updatedAt: ts,
+          });
+          await this.emit(threadId, taskId, teamId, 'teammate_paused', { teammateId: tm.id });
+        }
+      }
+      await this.emit(threadId, taskId, teamId, 'team_paused', { requestedByUserId });
+      return next;
+    }
+    if (kind === 'resume') {
+      if (team.status !== 'paused') return team;
+      const next: Team = { ...team, status: 'active', updatedAt: ts };
+      await this.deps.rt.teams.saveTeam(next);
+      const teammates = await this.deps.rt.teams.listTeammates(threadId, taskId, teamId);
+      for (const tm of teammates) {
+        if (tm.status === 'paused') {
+          // Continue from lastMessageCursor on next tick (kept as-is).
+          await this.deps.rt.teams.saveTeammate(threadId, taskId, {
+            ...tm,
+            status: 'idle',
+            updatedAt: ts,
+          });
+          await this.emit(threadId, taskId, teamId, 'teammate_resumed', { teammateId: tm.id });
+        }
+      }
+      await this.emit(threadId, taskId, teamId, 'team_resumed', { requestedByUserId });
+      return next;
+    }
+    return team;
+  }
+
+  /**
+   * Wait for a team to reach a terminal status (completed | failed | cancelled).
+   * Used by parent ThreadLoop cancel cascade (acceptance 61) and PlanRevision
+   * cascade (acceptance 62) to ensure team_cancelled is appended BEFORE the
+   * caller proceeds.
+   */
+  async waitForTeamTerminal(
+    threadId: string,
+    taskId: string,
+    teamId: string,
+    timeoutMs = 30_000,
+  ): Promise<TeamStatus | undefined> {
+    return this.waitForStatus(
+      threadId,
+      taskId,
+      teamId,
+      (s) => s === 'completed' || s === 'failed' || s === 'cancelled',
+      timeoutMs,
+    );
+  }
+
+  async waitForTeamPaused(
+    threadId: string,
+    taskId: string,
+    teamId: string,
+    timeoutMs = 10_000,
+  ): Promise<TeamStatus | undefined> {
+    return this.waitForStatus(
+      threadId,
+      taskId,
+      teamId,
+      (s) => s === 'paused' || s === 'cancelled' || s === 'completed' || s === 'failed',
+      timeoutMs,
+    );
+  }
+
+  private async waitForStatus(
+    threadId: string,
+    taskId: string,
+    teamId: string,
+    pred: (s: TeamStatus) => boolean,
+    timeoutMs: number,
+  ): Promise<TeamStatus | undefined> {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      const t = await this.deps.rt.teams.getTeam(threadId, taskId, teamId);
+      if (t && pred(t.status as TeamStatus)) return t.status as TeamStatus;
+      await new Promise((r) => setTimeout(r, 25));
+    }
+    const last = await this.deps.rt.teams.getTeam(threadId, taskId, teamId);
+    return last?.status as TeamStatus | undefined;
   }
 
   private async emit(

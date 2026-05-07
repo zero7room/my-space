@@ -75,6 +75,8 @@ export const TEAM_EVENT_KINDS = [
   'team_completed',
   'team_failed',
   'team_cancelled',
+  'team_paused',
+  'team_resumed',
   'team_message_appended',
   'team_message_posted',
   'team_work_item_created',
