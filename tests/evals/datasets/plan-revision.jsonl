@@ -1,0 +1,3 @@
+{"id":"pr-1","input":{"oldRevisionHasArtifacts":true,"taskFailed":false},"label":"archive_artifacts_and_change_record"}
+{"id":"pr-2","input":{"oldRevisionHasArtifacts":false,"taskFailed":true},"label":"reset_retry_state"}
+{"id":"pr-3","input":{"oldRevisionHasArtifacts":true,"taskFailed":true},"label":"archive_and_reset"}

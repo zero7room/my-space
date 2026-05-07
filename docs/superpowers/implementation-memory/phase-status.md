@@ -6,45 +6,34 @@
 
 ## Current Phase
 
-Phase 5: ThreadLoop + Confirmation + Plan Revision — PENDING
+Phase 6: Executor + Tools + Skills + CriticalNodePolicy — PENDING
 
 ## Completed Phases
 
-### Phase 0: Repository Scaffold — 2026-05-06
+### Phase 0–4 (summarized above)
 
-ok.
+- 0: scaffold; 1: contracts; 2: fs-store; 3: repos+recovery; 4: api+sse.
 
-### Phase 1: Contracts, IDs, Schemas, State Machines — 2026-05-07
+### Phase 5: ThreadLoop + MessageGuard + Confirmation + Plan Revision — 2026-05-07
 
-contracts: 45 tests pass.
-
-### Phase 2: Filesystem Store + Transactions — 2026-05-07
-
-fs-store: 27 tests pass.
-
-### Phase 3: Runtime Repositories + Recovery — 2026-05-07
-
-bot-runtime: 14 tests (repositories + recovery).
-
-### Phase 4: Fastify API + Auth + SSE — 2026-05-07
-
-bot-runtime: +11 tests (server + SSE bus). Total bot-runtime: 25.
-- `pnpm -r build` / `test` / `lint` → green. Total tests: 97.
+Verification:
+- `pnpm -r build` / `test` / `lint` → green.
+- bot-runtime: 39 tests across 7 files (added: message-guard×6, thread-loop×7, eval×1).
+- `pnpm test:evals` → message-guard eval passes (10-row bundled).
 
 Modules:
-- `apps/bot-runtime/src/auth/user-token.ts` — `LOCAL_USER_TOKENS` parser, redacted token hint, `TokenAuthService`.
-- `apps/bot-runtime/src/runtime/sse/bus.ts` — `ThreadEventBus` ring buffer with replay, age + cap eviction, team-active uplift; `SseRegistry` per-thread.
-- `apps/bot-runtime/src/api/server.ts` — Fastify boot: instance lock → recovery scan → routes; `Authorization: Bearer` preHandler with redact log + owner-first helper.
-- `apps/bot-runtime/src/api/routes/{users,threads,tasks,artifacts,channels,policies,skills,teams,health}.ts` — full route surface from Phase 1 contract; cross-phase actions write to `control.json` pendingSignals (Phase 5 will consume).
+- `apps/bot-runtime/src/thread-loop/message-guard.ts` — rule short-circuits + LLM adapter slot + `guard_degraded` fallback.
+- `apps/bot-runtime/src/thread-loop/thread-loop.ts` — drains `control.json` pendingSignals (cancel/pause/resume/manual_retry/skip/critical_node_decision/revise) and emits durable events.
+- `apps/bot-runtime/src/thread-loop/task-drafts.ts` — draft creation + owner-first confirmation that appends to TaskList.
+- `apps/bot-runtime/src/thread-loop/plan-revisions.ts` — full revision: pause→PlanRevision→ChangeRecord→artifact archive→retry reset (when failed)→plan_revised event.
+- `apps/bot-runtime/src/evals/{harness,index}.ts` — JSONL dataset loader + scoreClassification (accuracy + micro-F1 + per-label).
+- `tests/evals/datasets/{message-guard,task-confirmation,plan-revision}.jsonl` — bundled labeled samples (10/3/3 rows).
 
 ## Phase Index
 
-- [x] Phase 0: Repository Scaffold
-- [x] Phase 1: Contracts, IDs, Schemas, State Machines
-- [x] Phase 2: Filesystem Store, Transactions
-- [x] Phase 3: Runtime Repositories, Recovery Scan
-- [x] Phase 4: Fastify API, Auth, SSE
-- [ ] Phase 5: ThreadLoop, MessageGuard, Task Confirmation, Plan Revision
+- [x] Phase 0–4 above
+- [x] Phase 5: ThreadLoop, MessageGuard, Task Confirmation, Plan Revision
+- [ ] Phase 6: Executor, Runtime Loop, Tools, Skills, CriticalNodePolicy
 - [ ] Phase 6: Executor, Runtime Loop, Tools, Skills, CriticalNodePolicy
 - [ ] Phase 7: Retry, Blocked Actions, Notify Throttling, Recovery Hardening
 - [ ] Phase 8: Channel Subsystem, Feishu Provider

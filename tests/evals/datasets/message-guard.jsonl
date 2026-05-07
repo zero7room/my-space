@@ -1,0 +1,10 @@
+{"id":"mg-1","input":{"text":"please draft a Q3 marketing plan","source":"client","bound":true,"isOwner":true,"hasPendingConfirmation":false},"label":"chat"}
+{"id":"mg-2","input":{"text":"/confirm","source":"client","bound":true,"isOwner":true,"hasPendingConfirmation":true},"label":"confirm_task"}
+{"id":"mg-3","input":{"text":"/cancel","source":"client","bound":true,"isOwner":true,"hasPendingConfirmation":false},"label":"cancel_task"}
+{"id":"mg-4","input":{"text":"/pause","source":"client","bound":true,"isOwner":true,"hasPendingConfirmation":false},"label":"pause_task"}
+{"id":"mg-5","input":{"text":"/resume","source":"client","bound":true,"isOwner":true,"hasPendingConfirmation":false},"label":"resume_task"}
+{"id":"mg-6","input":{"text":"/status","source":"client","bound":true,"isOwner":true,"hasPendingConfirmation":false},"label":"progress_query"}
+{"id":"mg-7","input":{"text":"team standup at 11","source":"lark_group","bound":false,"isOwner":false,"hasPendingConfirmation":false},"label":"irrelevant"}
+{"id":"mg-8","input":{"text":"random group chatter","source":"lark_group","bound":true,"isOwner":false,"hasPendingConfirmation":false},"label":"irrelevant"}
+{"id":"mg-9","input":{"text":"@bot please update plan","source":"lark_group","bound":true,"isOwner":true,"hasPendingConfirmation":false,"mentionedBot":true},"label":"chat"}
+{"id":"mg-10","input":{"text":"@bot bind this thread","source":"lark_group","bound":false,"isOwner":true,"hasPendingConfirmation":false},"label":"chat"}
