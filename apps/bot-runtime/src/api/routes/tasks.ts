@@ -83,6 +83,38 @@ function ownerCheck(
   return true;
 }
 
+/**
+ * Owner check for action endpoints. On rejection, also writes a
+ * `task_action_denied{reason:"not_owner"}` event per acceptance 42.
+ */
+async function ownerCheckForAction(
+  req: FastifyRequest,
+  task: Task,
+  threadId: string,
+  reply: FastifyReply,
+  deps: Deps,
+  requestedAction: string,
+): Promise<boolean> {
+  if (req.auth!.user.id === task.ownerUserId) return true;
+  const now = new Date().toISOString();
+  const ev = await deps.rt.tasks.appendEvent(threadId, task.id, {
+    kind: 'task_action_denied',
+    taskId: task.id,
+    threadId,
+    payload: {
+      requestedAction,
+      reason: 'not_owner',
+      requestedByUserId: req.auth!.user.id,
+    },
+    at: now,
+  });
+  deps.sse.publish(ev);
+  reply.code(403).send({
+    error: { code: 'forbidden', message: 'owner-only action' },
+  });
+  return false;
+}
+
 export function registerTaskRoutes(app: FastifyInstance, deps: Deps): void {
   app.get<{ Params: { taskId: string } }>(
     '/api/tasks/:taskId',
@@ -161,16 +193,120 @@ export function registerTaskRoutes(app: FastifyInstance, deps: Deps): void {
     return { task: handle.task };
   });
 
-  action('/api/tasks/:taskId/skip', async ({ handle, req }) => {
-    await pushControlSignal(
-      deps.rt,
-      handle.threadId,
-      handle.task,
-      'skip',
-      req.auth!.user.id,
-    );
-    return { task: handle.task };
-  });
+  app.post<{ Params: { taskId: string } }>(
+    '/api/tasks/:taskId/skip',
+    async (req, reply) => {
+      const h = await loadTask(deps.rt, deps.taskIndex, req.params.taskId);
+      if (!h) return reply.code(404).send({ error: { code: 'not_found' } });
+      if (!(await ownerCheckForAction(req, h.task, h.threadId, reply, deps, 'skip'))) {
+        return;
+      }
+      const handle = h;
+      const now = new Date().toISOString();
+      const userId = req.auth!.user.id;
+      // status gate per acceptance 32 + 42
+      const skippableReasons = new Set([
+        'awaiting_user_action',
+        'non_idempotent_tool_in_flight',
+      ]);
+      const validState =
+        handle.task.status === 'blocked' &&
+        handle.task.blockedReason !== undefined &&
+        skippableReasons.has(handle.task.blockedReason);
+      if (!validState) {
+        const ev = await deps.rt.tasks.appendEvent(
+          handle.threadId,
+          handle.task.id,
+          {
+            kind: 'task_action_denied',
+            taskId: handle.task.id,
+            threadId: handle.threadId,
+            payload: {
+              requestedAction: 'skip',
+              reason: 'invalid_state',
+              requestedByUserId: userId,
+              currentStatus: handle.task.status,
+              currentBlockedReason: handle.task.blockedReason,
+            },
+            at: now,
+          },
+        );
+        deps.sse.publish(ev);
+        return reply.code(409).send({
+          error: { code: 'invalid_state', message: 'task not skip-eligible' },
+        });
+      }
+      const plan = await deps.rt.plans.get(handle.threadId, handle.task.id);
+      const activeIdx = plan
+        ? plan.steps.findIndex((s) => s.status === 'in_progress')
+        : -1;
+      const fallbackIdx = plan
+        ? plan.steps.findIndex((s) => s.status === 'pending')
+        : -1;
+      const idx = activeIdx >= 0 ? activeIdx : fallbackIdx;
+      if (!plan || idx < 0) {
+        const ev = await deps.rt.tasks.appendEvent(
+          handle.threadId,
+          handle.task.id,
+          {
+            kind: 'task_action_denied',
+            taskId: handle.task.id,
+            threadId: handle.threadId,
+            payload: {
+              requestedAction: 'skip',
+              reason: 'invalid_state',
+              requestedByUserId: userId,
+              detail: 'no_skippable_step',
+            },
+            at: now,
+          },
+        );
+        deps.sse.publish(ev);
+        return reply.code(409).send({
+          error: {
+            code: 'invalid_state',
+            message: 'no active plan step to skip',
+          },
+        });
+      }
+      const skippedStep = plan.steps[idx]!;
+      const updatedSteps = plan.steps.slice();
+      updatedSteps[idx] = { ...skippedStep, status: 'skipped' as const };
+      await deps.rt.plans.save(handle.threadId, {
+        ...plan,
+        steps: updatedSteps,
+        updatedAt: now,
+      });
+      const next = applyTaskTransition(handle.task, 'queued', { now });
+      next.lastUserSignalAt = now;
+      await deps.rt.tasks.update(next);
+      const stepEv = await deps.rt.tasks.appendEvent(handle.threadId, next.id, {
+        kind: 'plan_step_skipped',
+        taskId: next.id,
+        threadId: handle.threadId,
+        payload: { stepId: skippedStep.id, actorUserId: userId },
+        at: now,
+      });
+      deps.sse.publish(stepEv);
+      const resolvedEv = await deps.rt.tasks.appendEvent(
+        handle.threadId,
+        next.id,
+        {
+          kind: 'task_block_resolved',
+          taskId: next.id,
+          threadId: handle.threadId,
+          payload: {
+            action: 'skip',
+            actorUserId: userId,
+            stepId: skippedStep.id,
+          },
+          at: now,
+        },
+      );
+      deps.sse.publish(resolvedEv);
+      return { task: next };
+    },
+  );
 
   for (const verb of ['pause', 'resume', 'cancel'] as const) {
     action(`/api/tasks/:taskId/${verb}`, async ({ handle, req }) => {

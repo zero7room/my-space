@@ -25,6 +25,8 @@ export class RuntimeMetrics {
   readonly artifactConsistencyWarning: Counter<string>;
   readonly notifyThrottled: Counter<string>;
   readonly eventsJsonlRotated: Counter<string>;
+  readonly skillsLoadErrorTotal: Counter<string>;
+  readonly skillsFallbackToCacheTotal: Counter<string>;
 
   constructor() {
     collectDefaultMetrics({ register: this.registry });
@@ -128,6 +130,18 @@ export class RuntimeMetrics {
     this.eventsJsonlRotated = new Counter({
       name: 'ai_events_jsonl_rotated_total',
       help: 'events.jsonl files rotated at size/age threshold',
+      registers: [this.registry],
+    });
+    this.skillsLoadErrorTotal = new Counter({
+      name: 'ai_skills_load_error_total',
+      help: 'Skill load failures during runtime startup, labeled by error class',
+      labelNames: ['errorClass'],
+      registers: [this.registry],
+    });
+    this.skillsFallbackToCacheTotal = new Counter({
+      name: 'ai_skills_fallback_to_cache_total',
+      help: 'Skill load fallbacks to startup cache after consecutive failures',
+      labelNames: ['skillName'],
       registers: [this.registry],
     });
   }

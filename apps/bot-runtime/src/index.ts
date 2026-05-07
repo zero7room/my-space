@@ -1,12 +1,16 @@
 import 'dotenv/config';
 
 import { createServer } from './api/server.js';
+import { resolveWorkspaceRoot } from './config.js';
 
 async function main(): Promise<void> {
   const port = Number.parseInt(process.env['PORT'] ?? '4000', 10);
   const host = process.env['HOST'] ?? '0.0.0.0';
   const runtimeId = process.env['RUNTIME_ID'] ?? 'default';
-  const workspaceRoot = process.env['WORKSPACE_ROOT'] ?? process.cwd();
+  const workspaceRoot = resolveWorkspaceRoot(process.env['WORKSPACE_ROOT'], {
+    cwd: process.cwd(),
+    initCwd: process.env['INIT_CWD'],
+  });
   const localUserTokens = process.env['LOCAL_USER_TOKENS'];
 
   const handle = await createServer({

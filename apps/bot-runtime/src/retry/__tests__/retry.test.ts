@@ -134,6 +134,53 @@ describe('RetryScheduler', () => {
     expect(out.length).toBe(1);
     expect(out[0]?.status).toBe('queued');
   });
+
+  it('tickForThread skips schemaVersion=1 tasks (acceptance 36)', async () => {
+    const rt = mkrt();
+    const owner = newUserId();
+    const threadId = newThreadId();
+    await rt.threads.create({
+      id: threadId,
+      ownerUserId: owner,
+      title: 't',
+      status: 'idle',
+      taskListId: newTaskListId(),
+      channelBindingIds: [],
+      createdAt: NOW,
+      updatedAt: NOW,
+    });
+    const t: Task = {
+      id: newTaskId(),
+      threadId,
+      ownerUserId: owner,
+      title: 't',
+      description: '',
+      status: 'failed',
+      sourceMessageIds: [],
+      artifactIds: [],
+      changeRecordIds: [],
+      archivedRevisionIds: [],
+      schemaVersion: 1,
+      // Even if a v1 task somehow has a retry hint, the scheduler must skip it
+      // until the migrator upgrades it to v2.
+      retry: {
+        attemptCount: 0,
+        maxRetries: 2,
+        nextRetryAt: '2000-01-01T00:00:00.000Z',
+        lastFailureAt: NOW,
+        failureClass: 'transient_error',
+      },
+      blockedReason: 'retry_pending',
+      createdAt: NOW,
+      updatedAt: NOW,
+    };
+    await rt.tasks.create(t);
+    const sched = new RetryScheduler(rt, () => Date.parse('2026-05-08T00:00:00.000Z'));
+    const out = await sched.tickForThread(threadId);
+    expect(out.length).toBe(0);
+    const stored = await rt.tasks.get(threadId, t.id);
+    expect(stored?.status).toBe('failed');
+  });
 });
 
 describe('NotifyThrottle', () => {

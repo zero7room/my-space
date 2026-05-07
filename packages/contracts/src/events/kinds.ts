@@ -27,6 +27,9 @@ export const TASK_EVENT_KINDS = [
   'task_manual_retry_requested',
   'task_retry_reset_by_plan_update',
   'task_list_repair',
+  'task_schema_migrated',
+  'task_block_resolved',
+  'task_action_denied',
 ] as const;
 export type TaskEventKind = (typeof TASK_EVENT_KINDS)[number];
 

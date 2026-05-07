@@ -57,7 +57,7 @@ describe('RecoveryScanner', () => {
     const got = await rt.tasks.get(threadId, taskId);
     expect(got?.schemaVersion).toBe(2);
     expect(got?.retry).toEqual({ attemptCount: 0, maxRetries: 2 });
-    expect(r.events.some((e) => e.kind === 'task_state_transition')).toBe(true);
+    expect(r.events.some((e) => e.kind === 'task_schema_migrated')).toBe(true);
   });
 
   it('blocks running tasks with non_idempotent_tool_in_flight', async () => {

@@ -157,18 +157,57 @@ export class RecoveryScanner {
         const t = await this.taskRepo.get(threadId, taskId);
         if (!t) continue;
         const result = migrateTaskToV2(t);
+        let task = t;
         if (result.migrated) {
-          await this.taskRepo.update(result.task);
-          tasksMigrated++;
-          append({
-            kind: 'task_state_transition',
-            taskId: t.id,
-            threadId: t.threadId,
-            payload: { migration: 'v1->v2' },
-            at: this.clock.iso(),
-          });
+          try {
+            await this.taskRepo.update(result.task);
+            task = result.task;
+            tasksMigrated++;
+            append({
+              kind: 'task_schema_migrated',
+              taskId: t.id,
+              threadId: t.threadId,
+              payload: {
+                taskId: t.id,
+                fromVersion: result.fromVersion,
+                toVersion: result.toVersion,
+                migratedFields: result.migratedFields,
+              },
+              at: this.clock.iso(),
+            });
+          } catch (err) {
+            // Persist a sidecar marker so an operator can investigate. The
+            // original task.json is left untouched and no migration event is
+            // emitted (acceptance 35).
+            try {
+              const fsm = await import('node:fs/promises');
+              const marker = path.join(
+                this.paths.taskRoot(threadId, t.id),
+                'migration-pending.json',
+              );
+              await fsm.mkdir(path.dirname(marker), { recursive: true });
+              await fsm.writeFile(
+                marker,
+                JSON.stringify(
+                  {
+                    taskId: t.id,
+                    fromVersion: result.fromVersion,
+                    toVersion: result.toVersion,
+                    attemptedAt: this.clock.iso(),
+                    error: err instanceof Error ? err.message : String(err),
+                  },
+                  null,
+                  2,
+                ),
+              );
+            } catch {
+              /* best-effort marker */
+            }
+            // task remains the original v1 record
+          }
+        } else {
+          task = result.task;
         }
-        let task = result.task;
         // 8. recover stale running tasks
         if (task.status === 'running') {
           try {

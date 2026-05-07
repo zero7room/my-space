@@ -122,6 +122,14 @@ export class RetryScheduler {
     const out: Task[] = [];
     for (const t of tasks) {
       if (t.status !== 'failed') continue;
+      // Acceptance 36: skip tasks not yet migrated to schemaVersion=2. Missing
+      // or unparseable values are treated as 1 (the migrator's next round will
+      // upgrade them); never auto-retry until that happens.
+      const sv =
+        typeof t.schemaVersion === 'number' && Number.isFinite(t.schemaVersion)
+          ? t.schemaVersion
+          : 1;
+      if (sv < 2) continue;
       const r = t.retry;
       if (!r?.nextRetryAt) continue;
       if (Date.parse(r.nextRetryAt) > this.now()) continue;
