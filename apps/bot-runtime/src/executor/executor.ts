@@ -157,7 +157,11 @@ export class Executor {
           kind: 'task_blocked',
           taskId: task.id,
           threadId: opts.threadId,
-          payload: { question: proposed.question },
+          payload: {
+            question: proposed.question,
+            blockedReason: 'awaiting_user_action',
+            suggestedActions: ['retry', 'skip', 'cancel'],
+          },
           at: this.now,
         });
         if (this.deps.sse) this.deps.sse.publish(ev);
@@ -187,6 +191,17 @@ export class Executor {
           now: this.now,
         });
         await this.deps.rt.tasks.update(task);
+        const ev = await this.deps.rt.tasks.appendEvent(opts.threadId, task.id, {
+          kind: 'task_blocked',
+          taskId: task.id,
+          threadId: opts.threadId,
+          payload: {
+            blockedReason: 'awaiting_user_action',
+            suggestedActions: ['retry', 'skip', 'cancel'],
+          },
+          at: this.now,
+        });
+        if (this.deps.sse) this.deps.sse.publish(ev);
         return { finalStatus: 'blocked', steps };
       }
     }

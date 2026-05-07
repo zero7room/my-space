@@ -272,16 +272,35 @@ export const skillManifestSchema = z
   });
 export type SkillManifest = z.infer<typeof skillManifestSchema>;
 
+export const skillLoadErrorClassSchema = z.enum([
+  'schema_invalid',
+  'yaml_parse',
+  'name_conflict',
+]);
+export type SkillLoadErrorClass = z.infer<typeof skillLoadErrorClassSchema>;
+
 export const skillsLoadErrorSchema = z
   .object({
     kind: z.literal('skills_load_error'),
+    skillName: z.string().nullable(),
     skillPath: z.string(),
+    errorClass: skillLoadErrorClassSchema,
     reason: z.string(),
     field: z.string().nullable(),
     at: isoTimestamp,
   })
   .strict();
 export type SkillsLoadError = z.infer<typeof skillsLoadErrorSchema>;
+
+export const skillsFallbackToCacheSchema = z
+  .object({
+    kind: z.literal('skills_fallback_to_cache'),
+    skillName: z.string(),
+    cacheTimestamp: isoTimestamp,
+    at: isoTimestamp,
+  })
+  .strict();
+export type SkillsFallbackToCache = z.infer<typeof skillsFallbackToCacheSchema>;
 
 // ---------- Thread ----------------------------------------------------------
 

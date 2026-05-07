@@ -221,7 +221,11 @@ export class RecoveryScanner {
               kind: 'task_blocked',
               taskId: task.id,
               threadId: task.threadId,
-              payload: { reason: 'recovery_stale_running' },
+              payload: {
+                reason: 'recovery_stale_running',
+                blockedReason: 'non_idempotent_tool_in_flight',
+                suggestedActions: ['retry', 'skip', 'cancel'],
+              },
               at: this.clock.iso(),
             });
           } catch {
