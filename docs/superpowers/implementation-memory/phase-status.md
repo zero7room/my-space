@@ -24,14 +24,9 @@ Modules:
 
 ## Phase Index
 
-- [x] Phase 0–7 above
-- [x] Phase 8: Channel Subsystem, Feishu Provider
-- [ ] Phase 9: Agent Teams Runtime
-- [ ] Phase 6: Executor, Runtime Loop, Tools, Skills, CriticalNodePolicy
-- [ ] Phase 7: Retry, Blocked Actions, Notify Throttling, Recovery Hardening
-- [ ] Phase 8: Channel Subsystem, Feishu Provider
-- [ ] Phase 9: Agent Teams Runtime
-- [ ] Phase 10: Web Client Product Surface
+- [x] Phase 0–8 above
+- [x] Phase 9: Agent Teams Runtime
+- [x] Phase 10: Web Client Product Surface
 - [ ] Phase 11: Observability, Sanitization, Ops, Docs
 - [ ] Phase 12: E2E, Agent Evals, CI, Final Acceptance
 
