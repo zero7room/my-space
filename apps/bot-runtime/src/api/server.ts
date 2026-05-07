@@ -26,6 +26,7 @@ import { TokenAuthService, parseLocalUserTokens } from '../auth/user-token.js';
 import { RuntimePaths } from '../runtime/paths.js';
 import { RecoveryScanner } from '../runtime/recovery.js';
 import { SseRegistry } from '../runtime/sse/index.js';
+import { TaskIndex } from '../runtime/task-index.js';
 
 import { registerHealthRoutes } from './routes/health.js';
 import { registerUserRoutes } from './routes/users.js';
@@ -51,6 +52,7 @@ export interface ServerHandle {
   app: FastifyInstance;
   rt: RuntimePaths;
   sse: SseRegistry;
+  taskIndex: TaskIndex;
   lock?: InstanceLockHolder;
   close(): Promise<void>;
 }
@@ -78,6 +80,9 @@ export async function createServer(cfg: ServerConfig): Promise<ServerHandle> {
 
   // Run recovery on every boot. Errors bubble up and kill the process.
   await new RecoveryScanner({ paths: rt.paths }).run();
+
+  const taskIndex = new TaskIndex(rt);
+  await taskIndex.load();
 
   const tokenIndex = parseLocalUserTokens(cfg.localUserTokens);
   const auth = new TokenAuthService(tokenIndex, rt.users);
@@ -122,18 +127,19 @@ export async function createServer(cfg: ServerConfig): Promise<ServerHandle> {
 
   registerHealthRoutes(app, { rt, lock, startedAt: new Date().toISOString() });
   registerUserRoutes(app);
-  registerThreadRoutes(app, { rt, sse });
-  registerTaskRoutes(app, { rt, sse });
+  registerThreadRoutes(app, { rt, sse, taskIndex });
+  registerTaskRoutes(app, { rt, sse, taskIndex });
   registerArtifactRoutes(app, { rt });
   registerChannelRoutes(app, { rt });
   registerPolicyRoutes(app, { rt });
   registerSkillRoutes(app, { rt });
-  registerTeamRoutes(app, { rt });
+  registerTeamRoutes(app, { rt, taskIndex });
 
   return {
     app,
     rt,
     sse,
+    taskIndex,
     lock,
     async close() {
       await app.close();

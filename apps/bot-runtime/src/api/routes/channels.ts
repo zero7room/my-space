@@ -125,25 +125,40 @@ export function registerChannelRoutes(
     },
   );
 
-  // Webhook intentionally bypassed by auth preHandler — Phase 8 will validate
-  // signatures. v1 records the inbound payload to the diagnostics path.
+  // Webhook: bypassed by auth preHandler. Feishu HMAC verify when configured.
   app.post('/api/channels/feishu/webhook', async (req, reply) => {
-    const body = req.body as Record<string, unknown> | undefined;
-    const externalEventId =
-      (body?.['header'] as Record<string, unknown> | undefined)?.[
-        'event_id'
-      ] as string | undefined;
-    if (!externalEventId) {
-      return reply.code(400).send({ error: { code: 'bad_request' } });
-    }
-    await deps.rt.channelEvents.record({
-      id: `che_${externalEventId.padEnd(21, '0').slice(0, 21)}` as `che_${string}`,
-      provider: 'feishu',
-      externalEventId,
-      status: 'received',
-      payloadRef: externalEventId,
-      createdAt: new Date().toISOString(),
+    const cfg = await deps.rt.channelConfigs.get('feishu');
+    const encryptKey = cfg?.secretRefs['encryptKey'];
+    const verificationToken = (cfg?.publicFields['verificationToken'] as string | undefined);
+    const provider = new (await import('../../channels/feishu.js')).FeishuProvider({
+      verificationToken,
+      encryptKey,
     });
+    const sig = (req.headers['x-lark-signature'] ?? req.headers['x-lark-request-signature']) as
+      | string
+      | undefined;
+    const ts = (req.headers['x-lark-request-timestamp'] ?? req.headers['x-lark-timestamp']) as
+      | string
+      | undefined;
+    const out = await provider.handleInbound({
+      body: req.body,
+      signatureHeader: sig,
+      timestampHeader: ts,
+      rawBody: Buffer.from(JSON.stringify(req.body ?? {})),
+    });
+    if (!out.signatureValid) {
+      return reply.code(401).send({ error: { code: 'unauthorized' } });
+    }
+    if (out.event) {
+      // Idempotency: first-write-wins via repo.
+      const existing = await deps.rt.channelEvents.get(
+        out.event.provider,
+        out.event.externalEventId,
+      );
+      if (!existing) {
+        await deps.rt.channelEvents.record(out.event);
+      }
+    }
     return { ok: true };
   });
 }

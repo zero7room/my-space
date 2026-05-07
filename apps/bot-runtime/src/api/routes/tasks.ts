@@ -9,10 +9,12 @@ import {
 
 import type { RuntimePaths } from '../../runtime/paths.js';
 import type { SseRegistry } from '../../runtime/sse/index.js';
+import type { TaskIndex } from '../../runtime/task-index.js';
 
 interface Deps {
   rt: RuntimePaths;
   sse: SseRegistry;
+  taskIndex: TaskIndex;
 }
 
 interface TaskHandle {
@@ -22,14 +24,22 @@ interface TaskHandle {
 
 async function loadTask(
   rt: RuntimePaths,
+  taskIndex: TaskIndex,
   taskId: string,
 ): Promise<TaskHandle | undefined> {
-  // Tasks are stored under tasks/<taskId>; we don't have a direct lookup, so
-  // we scan threads. Phase 11 will add an index. For v1 fan-out is fine.
+  const indexedThread = taskIndex.threadFor(taskId);
+  if (indexedThread) {
+    const got = await rt.tasks.get(indexedThread, taskId);
+    if (got) return { task: got, threadId: indexedThread };
+  }
+  // Fallback scan + index repair.
   const threads = await rt.threads.list();
   for (const t of threads) {
     const got = await rt.tasks.get(t.id, taskId);
-    if (got) return { task: got, threadId: t.id };
+    if (got) {
+      await taskIndex.note(taskId, t.id);
+      return { task: got, threadId: t.id };
+    }
   }
   return undefined;
 }
@@ -77,7 +87,7 @@ export function registerTaskRoutes(app: FastifyInstance, deps: Deps): void {
   app.get<{ Params: { taskId: string } }>(
     '/api/tasks/:taskId',
     async (req, reply) => {
-      const h = await loadTask(deps.rt, req.params.taskId);
+      const h = await loadTask(deps.rt, deps.taskIndex, req.params.taskId);
       if (!h) return reply.code(404).send({ error: { code: 'not_found' } });
       if (!ownerCheck(req, h.task, reply)) return;
       return { task: h.task };
@@ -91,7 +101,7 @@ export function registerTaskRoutes(app: FastifyInstance, deps: Deps): void {
     ) => Promise<unknown>,
   ): void => {
     app.post<{ Params: { taskId: string } }>(routePath, async (req, reply) => {
-      const h = await loadTask(deps.rt, req.params.taskId);
+      const h = await loadTask(deps.rt, deps.taskIndex, req.params.taskId);
       if (!h) return reply.code(404).send({ error: { code: 'not_found' } });
       if (!ownerCheck(req, h.task, reply)) return;
       return fn({ req, reply, handle: h });
@@ -208,7 +218,7 @@ export function registerTaskRoutes(app: FastifyInstance, deps: Deps): void {
   app.get<{ Params: { taskId: string } }>(
     '/api/tasks/:taskId/retry-history',
     async (req, reply) => {
-      const h = await loadTask(deps.rt, req.params.taskId);
+      const h = await loadTask(deps.rt, deps.taskIndex, req.params.taskId);
       if (!h) return reply.code(404).send({ error: { code: 'not_found' } });
       if (!ownerCheck(req, h.task, reply)) return;
       const events = await deps.rt.tasks.readEventsSince(
@@ -235,7 +245,7 @@ export function registerTaskRoutes(app: FastifyInstance, deps: Deps): void {
   app.get<{ Params: { taskId: string } }>(
     '/api/tasks/:taskId/plans',
     async (req, reply) => {
-      const h = await loadTask(deps.rt, req.params.taskId);
+      const h = await loadTask(deps.rt, deps.taskIndex, req.params.taskId);
       if (!h) return reply.code(404).send({ error: { code: 'not_found' } });
       if (!ownerCheck(req, h.task, reply)) return;
       const plan = await deps.rt.plans.get(h.threadId, h.task.id);
@@ -247,7 +257,7 @@ export function registerTaskRoutes(app: FastifyInstance, deps: Deps): void {
   app.get<{ Params: { taskId: string; planRevisionId: string } }>(
     '/api/tasks/:taskId/plans/:planRevisionId',
     async (req, reply) => {
-      const h = await loadTask(deps.rt, req.params.taskId);
+      const h = await loadTask(deps.rt, deps.taskIndex, req.params.taskId);
       if (!h) return reply.code(404).send({ error: { code: 'not_found' } });
       if (!ownerCheck(req, h.task, reply)) return;
       const rev = await deps.rt.planRevisions.get(
@@ -264,7 +274,7 @@ export function registerTaskRoutes(app: FastifyInstance, deps: Deps): void {
     app.post<{ Params: { taskId: string; planRevisionId: string } }>(
       `/api/tasks/:taskId/plans/:planRevisionId/${v}`,
       async (req, reply) => {
-        const h = await loadTask(deps.rt, req.params.taskId);
+        const h = await loadTask(deps.rt, deps.taskIndex, req.params.taskId);
         if (!h) return reply.code(404).send({ error: { code: 'not_found' } });
         if (!ownerCheck(req, h.task, reply)) return;
         await pushControlSignal(

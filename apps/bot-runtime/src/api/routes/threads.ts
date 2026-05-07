@@ -15,10 +15,12 @@ import {
 
 import type { RuntimePaths } from '../../runtime/paths.js';
 import type { SseRegistry } from '../../runtime/sse/index.js';
+import type { TaskIndex } from '../../runtime/task-index.js';
 
 interface Deps {
   rt: RuntimePaths;
   sse: SseRegistry;
+  taskIndex: TaskIndex;
 }
 
 export function registerThreadRoutes(app: FastifyInstance, deps: Deps): void {
@@ -164,8 +166,26 @@ export function registerThreadRoutes(app: FastifyInstance, deps: Deps): void {
         reply.code(400);
         return { error: { code: 'bad_request', message: parsed.error.message } };
       }
-      // v1 ack is informational; SSE replay is driven by `since` query.
-      return { ok: true };
+      const t = await deps.rt.threads.get(req.params.threadId);
+      if (!t || t.ownerUserId !== req.auth!.user.id) {
+        reply.code(403);
+        return { error: { code: 'forbidden', message: 'not owner' } };
+      }
+      // Best-effort: parse the seq off the lastEventId tail. Client-supplied
+      // ids carry no seq directly; we trust a numeric `seq` query param if
+      // present, else look it up in the buffer.
+      const seqParam = (req.query as Record<string, unknown> | undefined)?.['seq'];
+      let lastSeq: number | undefined;
+      if (typeof seqParam === 'string') lastSeq = Number.parseInt(seqParam, 10);
+      if (lastSeq === undefined || Number.isNaN(lastSeq)) {
+        const tail = deps.sse.forThread(t.id).bufferTail();
+        if (tail) lastSeq = tail.seq;
+      }
+      const subId = req.headers['x-sse-subscriber-id'] as string | undefined;
+      if (subId && typeof lastSeq === 'number') {
+        deps.sse.forThread(t.id).noteAck(subId, lastSeq);
+      }
+      return { ok: true, ackedSeq: lastSeq };
     },
   );
 }

@@ -115,3 +115,45 @@ describe('SseRegistry per-thread isolation', () => {
     expect(reg.forThread('th_b').bufferLength()).toBe(1);
   });
 });
+
+describe('ThreadEventBus ack timeout tracking', () => {
+  it('reports subscribers that fell behind past ackTimeoutMs', () => {
+    let now = 0;
+    const bus = new ThreadEventBus({
+      bufferEvents: 100,
+      bufferEventsWithTeam: 200,
+      maxAgeSec: 60,
+      ackTimeoutMs: 1_000,
+      now: () => now,
+    });
+    // Subscriber acks seq 0 at t=0, buffer advances to seq 5.
+    bus.publish(ev(0));
+    bus.noteAck('sub-A', 0);
+    for (let i = 1; i <= 5; i++) bus.publish(ev(i));
+
+    now = 500; // below timeout
+    expect(bus.checkAckTimeouts()).toHaveLength(0);
+
+    now = 2_000; // past timeout
+    const missing = bus.checkAckTimeouts();
+    expect(missing).toHaveLength(1);
+    expect(missing[0]!.subscriberId).toBe('sub-A');
+    expect(missing[0]!.lastAckedSeq).toBe(0);
+    expect(missing[0]!.gap).toBe(5);
+  });
+
+  it('ignores subscribers that are caught up', () => {
+    let now = 0;
+    const bus = new ThreadEventBus({
+      bufferEvents: 100,
+      bufferEventsWithTeam: 200,
+      maxAgeSec: 60,
+      ackTimeoutMs: 1_000,
+      now: () => now,
+    });
+    for (let i = 0; i <= 2; i++) bus.publish(ev(i));
+    bus.noteAck('sub-B', 2);
+    now = 10_000;
+    expect(bus.checkAckTimeouts()).toHaveLength(0);
+  });
+});

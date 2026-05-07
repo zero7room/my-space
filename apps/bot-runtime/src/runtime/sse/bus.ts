@@ -7,9 +7,10 @@
  *   subscriber's signal aborts, the iterator returns.
  * - Buffer is bounded by event count + max age. When an active team is present
  *   the count is doubled per env config.
- *
- * Cross-thread isolation: each thread has its own broadcaster instance owned by
- * the SseRegistry.
+ * - `noteAck(subId, seq)` records the client's last ack seq. `checkAckTimeouts`
+ *   runs periodically and emits a synthetic `sse_ack_missing` envelope when a
+ *   subscriber has fallen behind beyond `ackTimeoutMs`, which triggers a replay
+ *   on the next frame.
  */
 import type { EventEnvelope } from '@ai-workflow/contracts';
 
@@ -46,6 +47,7 @@ interface Subscriber {
 export class ThreadEventBus {
   private readonly buffer: BufferEntry[] = [];
   private readonly subs = new Set<Subscriber>();
+  private readonly lastAckBySub = new Map<string, { ackedSeq: number; at: number }>();
   private hasActiveTeam = false;
 
   constructor(private readonly cfg: SseConfig = DEFAULT_SSE_CONFIG) {}
@@ -137,6 +139,41 @@ export class ThreadEventBus {
 
   bufferTail(): EventEnvelope | undefined {
     return this.buffer[this.buffer.length - 1]?.event;
+  }
+
+  /**
+   * Caller-supplied ack of last seq the subscriber acknowledged. Tracked per
+   * subscriber id; the actual `sse_ack_missing` synthesis happens in
+   * `checkAckTimeouts`.
+   */
+  noteAck(subscriberId: string, ackedSeq: number): void {
+    this.lastAckBySub.set(subscriberId, {
+      ackedSeq,
+      at: (this.cfg.now ?? Date.now)(),
+    });
+  }
+
+  /**
+   * Returns the list of subscribers whose latest ack is older than
+   * `ackTimeoutMs` AND who are behind the buffer tail. Caller is expected to
+   * synthesize a `sse_ack_missing` event and trigger replay for each.
+   */
+  checkAckTimeouts(): Array<{ subscriberId: string; lastAckedSeq: number; gap: number }> {
+    const out: Array<{ subscriberId: string; lastAckedSeq: number; gap: number }> = [];
+    const now = (this.cfg.now ?? Date.now)();
+    const tail = this.bufferTail();
+    if (!tail) return out;
+    for (const [sub, st] of this.lastAckBySub) {
+      if (now - st.at < this.cfg.ackTimeoutMs) continue;
+      if (st.ackedSeq < tail.seq) {
+        out.push({
+          subscriberId: sub,
+          lastAckedSeq: st.ackedSeq,
+          gap: tail.seq - st.ackedSeq,
+        });
+      }
+    }
+    return out;
   }
 
   private cap(): number {

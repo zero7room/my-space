@@ -55,6 +55,43 @@ describe('FeishuProvider', () => {
     });
     expect(r.status).toBe('succeeded');
   });
+
+  it('rejects when encryptKey set but signature missing', async () => {
+    const p = new FeishuProvider({ encryptKey: 'secret' });
+    const out = await p.handleInbound({
+      body: { token: 't', header: { event_id: 'e' } },
+    });
+    expect(out.signatureValid).toBe(false);
+  });
+
+  it('accepts modern HMAC signature', async () => {
+    const { createHmac } = await import('node:crypto');
+    const ts = '1700000000';
+    const raw = Buffer.from('{"header":{"event_id":"hmac1"}}');
+    const sig = createHmac('sha256', 'k1')
+      .update(`${ts}${raw.toString('utf8')}`)
+      .digest('hex');
+    const p = new FeishuProvider({ encryptKey: 'k1' });
+    const out = await p.handleInbound({
+      body: { header: { event_id: 'hmac1' } },
+      signatureHeader: sig,
+      timestampHeader: ts,
+      rawBody: raw,
+    });
+    expect(out.signatureValid).toBe(true);
+    expect(out.idempotencyKey).toBe('hmac1');
+  });
+
+  it('rejects forged signature', async () => {
+    const p = new FeishuProvider({ encryptKey: 'k1' });
+    const out = await p.handleInbound({
+      body: { header: { event_id: 'hmac2' } },
+      signatureHeader: 'deadbeef'.repeat(8),
+      timestampHeader: '1700000000',
+      rawBody: Buffer.from('{}'),
+    });
+    expect(out.signatureValid).toBe(false);
+  });
 });
 
 describe('OutboundJobProcessor', () => {

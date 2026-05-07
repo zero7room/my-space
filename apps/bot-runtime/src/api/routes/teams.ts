@@ -1,17 +1,35 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 
 import type { RuntimePaths } from '../../runtime/paths.js';
+import type { TaskIndex } from '../../runtime/task-index.js';
+
+interface Deps {
+  rt: RuntimePaths;
+  taskIndex: TaskIndex;
+}
 
 async function loadTaskOwnerThread(
-  rt: RuntimePaths,
+  deps: Deps,
   taskId: string,
   req: FastifyRequest,
   reply: FastifyReply,
 ): Promise<{ threadId: string; ownerOk: boolean } | undefined> {
-  const threads = await rt.threads.list();
+  const indexed = deps.taskIndex.threadFor(taskId);
+  if (indexed) {
+    const got = await deps.rt.tasks.get(indexed, taskId);
+    if (got) {
+      if (got.ownerUserId !== req.auth!.user.id) {
+        reply.code(403).send({ error: { code: 'forbidden' } });
+        return { threadId: indexed, ownerOk: false };
+      }
+      return { threadId: indexed, ownerOk: true };
+    }
+  }
+  const threads = await deps.rt.threads.list();
   for (const t of threads) {
-    const got = await rt.tasks.get(t.id, taskId);
+    const got = await deps.rt.tasks.get(t.id, taskId);
     if (!got) continue;
+    await deps.taskIndex.note(taskId, t.id);
     if (got.ownerUserId !== req.auth!.user.id) {
       reply.code(403).send({ error: { code: 'forbidden' } });
       return { threadId: t.id, ownerOk: false };
@@ -24,12 +42,12 @@ async function loadTaskOwnerThread(
 
 export function registerTeamRoutes(
   app: FastifyInstance,
-  deps: { rt: RuntimePaths },
+  deps: Deps,
 ): void {
   app.get<{ Params: { taskId: string } }>(
     '/api/tasks/:taskId/teams',
     async (req, reply) => {
-      const r = await loadTaskOwnerThread(deps.rt, req.params.taskId, req, reply);
+      const r = await loadTaskOwnerThread(deps, req.params.taskId, req, reply);
       if (!r || !r.ownerOk) return;
       const teams = await deps.rt.teams.listTeamsForTask(r.threadId, req.params.taskId);
       return { teams };
@@ -39,7 +57,7 @@ export function registerTeamRoutes(
   app.get<{ Params: { taskId: string; teamId: string } }>(
     '/api/tasks/:taskId/teams/:teamId',
     async (req, reply) => {
-      const r = await loadTaskOwnerThread(deps.rt, req.params.taskId, req, reply);
+      const r = await loadTaskOwnerThread(deps, req.params.taskId, req, reply);
       if (!r || !r.ownerOk) return;
       const team = await deps.rt.teams.getTeam(r.threadId, req.params.taskId, req.params.teamId);
       if (!team) return reply.code(404).send({ error: { code: 'not_found' } });
@@ -50,7 +68,7 @@ export function registerTeamRoutes(
   app.get<{ Params: { taskId: string; teamId: string } }>(
     '/api/tasks/:taskId/teams/:teamId/work-items',
     async (req, reply) => {
-      const r = await loadTaskOwnerThread(deps.rt, req.params.taskId, req, reply);
+      const r = await loadTaskOwnerThread(deps, req.params.taskId, req, reply);
       if (!r || !r.ownerOk) return;
       const buckets = ['available', 'claimed', 'completed', 'failed', 'cancelled'] as const;
       const out = (
@@ -67,7 +85,7 @@ export function registerTeamRoutes(
   app.get<{ Params: { taskId: string; teamId: string } }>(
     '/api/tasks/:taskId/teams/:teamId/messages',
     async (req, reply) => {
-      const r = await loadTaskOwnerThread(deps.rt, req.params.taskId, req, reply);
+      const r = await loadTaskOwnerThread(deps, req.params.taskId, req, reply);
       if (!r || !r.ownerOk) return;
       const messages = await deps.rt.teams.readTeamMessages(r.threadId, req.params.taskId, req.params.teamId);
       return { messages };
@@ -77,7 +95,7 @@ export function registerTeamRoutes(
   app.get<{ Params: { taskId: string; teamId: string } }>(
     '/api/tasks/:taskId/teams/:teamId/teammates',
     async (req, reply) => {
-      const r = await loadTaskOwnerThread(deps.rt, req.params.taskId, req, reply);
+      const r = await loadTaskOwnerThread(deps, req.params.taskId, req, reply);
       if (!r || !r.ownerOk) return;
       const teammates = await deps.rt.teams.listTeammates(r.threadId, req.params.taskId, req.params.teamId);
       return { teammates };
@@ -89,7 +107,7 @@ export function registerTeamRoutes(
   }>(
     '/api/tasks/:taskId/teams/:teamId/teammates/:teammateId/events',
     async (req, reply) => {
-      const r = await loadTaskOwnerThread(deps.rt, req.params.taskId, req, reply);
+      const r = await loadTaskOwnerThread(deps, req.params.taskId, req, reply);
       if (!r || !r.ownerOk) return;
       // Phase 9 wires real events.
       void req.params.teammateId;
@@ -100,7 +118,7 @@ export function registerTeamRoutes(
   app.get<{ Params: { taskId: string; teamId: string } }>(
     '/api/tasks/:taskId/teams/:teamId/events',
     async (req, reply) => {
-      const r = await loadTaskOwnerThread(deps.rt, req.params.taskId, req, reply);
+      const r = await loadTaskOwnerThread(deps, req.params.taskId, req, reply);
       if (!r || !r.ownerOk) return;
       const events = await deps.rt.teams.readTeamEvents(r.threadId, req.params.taskId, req.params.teamId);
       return { events };
@@ -119,7 +137,7 @@ export function registerTeamRoutes(
     app.post<{ Params: { taskId: string; teamId: string } }>(
       `/api/tasks/:taskId/teams/:teamId/${verb}`,
       async (req, reply) => {
-        const r = await loadTaskOwnerThread(deps.rt, req.params.taskId, req, reply);
+        const r = await loadTaskOwnerThread(deps, req.params.taskId, req, reply);
         if (!r || !r.ownerOk) return;
         const team = await deps.rt.teams.getTeam(r.threadId, req.params.taskId, req.params.teamId);
         if (!team) return reply.code(404).send({ error: { code: 'not_found' } });
@@ -135,7 +153,7 @@ export function registerTeamRoutes(
     }>(
       `/api/tasks/:taskId/teams/:teamId/teammates/:teammateId/${decision}`,
       async (req, reply) => {
-        const r = await loadTaskOwnerThread(deps.rt, req.params.taskId, req, reply);
+        const r = await loadTaskOwnerThread(deps, req.params.taskId, req, reply);
         if (!r || !r.ownerOk) return;
         // Phase 9 wires the teammate critical-node decision; v1 boundary acks.
         return { ok: true };

@@ -155,4 +155,51 @@ describe('NotifyThrottle', () => {
     now = 1500;
     expect(t.consume('feishu', 'oc')).toBe(true);
   });
+
+  it('isolates per (taskId, kind) composite', () => {
+    let now = 0;
+    const t = new NotifyThrottle({ capacity: 1, refillPerSec: 0, now: () => now });
+    const base = { provider: 'feishu', externalId: 'oc_x' } as const;
+    expect(
+      t.consume({ ...base, taskId: 'ta_1', notificationKind: 'task_failed' }),
+    ).toBe(true);
+    // Same conversation, different kind → separate bucket.
+    expect(
+      t.consume({ ...base, taskId: 'ta_1', notificationKind: 'task_retry_started' }),
+    ).toBe(true);
+    // Repeat exact composite → drop.
+    expect(
+      t.consume({ ...base, taskId: 'ta_1', notificationKind: 'task_failed' }),
+    ).toBe(false);
+  });
+
+  it('reset lets a manual retry break the window', () => {
+    let now = 0;
+    const t = new NotifyThrottle({ capacity: 1, refillPerSec: 0, now: () => now });
+    const key = {
+      provider: 'feishu',
+      externalId: 'oc_x',
+      taskId: 'ta_1',
+      notificationKind: 'task_failed',
+    } as const;
+    expect(t.consume(key)).toBe(true);
+    expect(t.consume(key)).toBe(false);
+    t.reset(key);
+    expect(t.consume(key)).toBe(true);
+  });
+
+  it('global per-provider cap bounds overall rate', () => {
+    let now = 0;
+    const t = new NotifyThrottle({
+      capacity: 1_000,
+      refillPerSec: 1_000,
+      globalPerProviderRpm: 2,
+      now: () => now,
+    });
+    expect(t.consume({ provider: 'feishu', externalId: 'a' })).toBe(true);
+    expect(t.consume({ provider: 'feishu', externalId: 'b' })).toBe(true);
+    expect(t.consume({ provider: 'feishu', externalId: 'c' })).toBe(false);
+    // Slack isolated.
+    expect(t.consume({ provider: 'slack', externalId: 'x' })).toBe(true);
+  });
 });

@@ -1,14 +1,11 @@
 /**
  * Feishu (Lark) channel provider. v1 implements:
- *   - HMAC verify of inbound webhook (encrypted/non-encrypted modes
- *     supported via a `verifySignature` callback so the provider stays
- *     testable without leaking app secrets).
+ *   - HMAC verify of inbound webhook when an `encryptKey` is configured.
+ *   - Verification-token check otherwise.
  *   - Inbound parsing into ingestedMessage for ThreadLoop.
  *   - Outbound stub that returns succeeded for v1 (real Lark API call slot).
- *
- * Token / app secret resolution is out-of-band: callers pass a verifier.
  */
-import { createHash } from 'node:crypto';
+import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 
 import { newChannelEventId } from '@ai-workflow/contracts';
 
@@ -21,9 +18,7 @@ import type {
 } from './provider.js';
 
 export interface FeishuConfig {
-  /** Optional verification token; when present, payloads must include it. */
   verificationToken?: string;
-  /** Optional encrypt key; v1 does not decrypt — we only check token. */
   encryptKey?: string;
 }
 
@@ -32,9 +27,21 @@ export class FeishuProvider implements ChannelProvider {
   constructor(private readonly cfg: FeishuConfig = {}) {}
 
   async handleInbound(input: InboundContext): Promise<InboundOutcome> {
+    if (this.cfg.encryptKey) {
+      if (!input.signatureHeader || !input.timestampHeader) {
+        return { signatureValid: false };
+      }
+      const ok = verifyFeishuHmac(
+        this.cfg.encryptKey,
+        input.timestampHeader,
+        input.rawBody,
+        input.signatureHeader,
+      );
+      if (!ok) return { signatureValid: false };
+    }
+
     const body = input.body as
       | {
-          schema?: string;
           token?: string;
           header?: { event_id?: string; event_type?: string };
           event?: {
@@ -44,15 +51,12 @@ export class FeishuProvider implements ChannelProvider {
               content?: string;
               chat_type?: string;
             };
-            sender?: {
-              sender_id?: { open_id?: string };
-            };
+            sender?: { sender_id?: { open_id?: string } };
           };
         }
       | undefined;
     if (!body) return { signatureValid: false };
 
-    // Verification token check (v1).
     if (this.cfg.verificationToken && body.token !== this.cfg.verificationToken) {
       return { signatureValid: false };
     }
@@ -60,7 +64,6 @@ export class FeishuProvider implements ChannelProvider {
     const eventId = body.header?.event_id;
     if (!eventId) return { signatureValid: false };
 
-    const idempotencyKey = eventId;
     const event = {
       id: newChannelEventId() as `che_${string}`,
       provider: 'feishu',
@@ -88,28 +91,56 @@ export class FeishuProvider implements ChannelProvider {
         fromExternalUserId: body.event?.sender?.sender_id?.open_id,
       };
     }
-    return { signatureValid: true, idempotencyKey, event, ingestedMessage };
+    return {
+      signatureValid: true,
+      idempotencyKey: eventId,
+      event,
+      ingestedMessage,
+    };
   }
 
   async handleOutbound(_input: OutboundContext): Promise<OutboundOutcome> {
-    // v1: success stub. Real implementation would POST to
-    // open.feishu.cn/open-apis/im/v1/messages with bearer token.
     return { status: 'succeeded', result: { delivered: true } };
   }
 }
 
 /**
- * HMAC helper for callers that want to verify a Feishu encrypted payload's
- * signature. v1 uses sha256 over `${timestamp}${nonce}${encryptKey}` per Lark
- * docs (subject to update — keep behind a flag).
+ * Accepts either:
+ *   - HMAC-SHA256(encryptKey, `${timestamp}${rawBody}`) → hex (modern Lark)
+ *   - SHA256(`${timestamp}${nonce}${encryptKey}`)       → hex (legacy challenge)
+ * Constant-time compared; either matching produces `true`.
  */
+export function verifyFeishuHmac(
+  encryptKey: string,
+  timestamp: string,
+  rawBody: Buffer | undefined,
+  signatureHex: string,
+): boolean {
+  const bodyStr = (rawBody ?? Buffer.alloc(0)).toString('utf8');
+  const hmac = createHmac('sha256', encryptKey)
+    .update(`${timestamp}${bodyStr}`)
+    .digest('hex');
+  if (constantTimeEq(hmac, signatureHex)) return true;
+  const legacy = createHash('sha256')
+    .update(`${timestamp}${bodyStr}${encryptKey}`)
+    .digest('hex');
+  return constantTimeEq(legacy, signatureHex);
+}
+
+function constantTimeEq(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(Buffer.from(a, 'utf8'), Buffer.from(b, 'utf8'));
+}
+
+/** Backward-compat helper kept for existing callers. */
 export function feishuSignatureValid(
   encryptKey: string,
   timestamp: string,
   nonce: string,
   expected: string,
 ): boolean {
-  const h = createHash('sha256');
-  h.update(`${timestamp}${nonce}${encryptKey}`);
-  return h.digest('hex') === expected;
+  const h = createHash('sha256')
+    .update(`${timestamp}${nonce}${encryptKey}`)
+    .digest('hex');
+  return constantTimeEq(h, expected);
 }
