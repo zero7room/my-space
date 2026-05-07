@@ -1,21 +1,21 @@
 {
-  "at": "2026-05-07T09:37:44.797Z",
+  "at": "2026-05-07T09:44:59.264Z",
   "result": {
-    "total": 150,
-    "correct": 142,
-    "accuracy": 0.9466666666666667,
+    "total": 180,
+    "correct": 166,
+    "accuracy": 0.9222222222222223,
     "teamRecall": 1,
-    "teamPrecision": 1,
+    "teamPrecision": 0.9375,
     "roleMicroF1": 1,
     "roleCounts": {
-      "tp": 157,
+      "tp": 196,
       "fp": 0,
       "fn": 0
     },
     "teamCounts": {
-      "truth": 50,
-      "predicted": 50,
-      "tp": 50
+      "truth": 60,
+      "predicted": 64,
+      "tp": 60
     }
   }
 }

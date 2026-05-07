@@ -148,3 +148,33 @@
 {"id":"to-t-048","input":{"description":"designer + coder-1 + tester team for mobile checkout"},"label":"team","roles":["designer","coder-1","tester"]}
 {"id":"to-t-049","input":{"description":"researcher + coder-1 + coder-2 + reviewer team to ship API v2"},"label":"team","roles":["researcher","coder-1","coder-2","reviewer"]}
 {"id":"to-t-050","input":{"description":"analyst + researcher + editor + fact-checker team for annual review"},"label":"team","roles":["analyst","researcher","editor","fact-checker"]}
+{"id":"to-adv-d-001","input":{"description":"answer factoid: did the team meeting happen at 3pm"},"label":"direct"}
+{"id":"to-adv-d-002","input":{"description":"fix typo in parallel-queries.md heading"},"label":"direct"}
+{"id":"to-adv-d-003","input":{"description":"rename file worker.ts to runner.ts in one repo"},"label":"direct"}
+{"id":"to-adv-d-004","input":{"description":"add comment documenting the researcher role enum value"},"label":"direct"}
+{"id":"to-adv-d-005","input":{"description":"reply yes/no: is the reviewer field nullable in the schema"},"label":"direct"}
+{"id":"to-adv-d-006","input":{"description":"update copy: change 'lead investigator' to 'principal'"},"label":"direct"}
+{"id":"to-adv-d-007","input":{"description":"delete unused constant BRANCH_A from config.ts"},"label":"direct"}
+{"id":"to-adv-d-008","input":{"description":"change error message to mention 'editor permission required'"},"label":"direct"}
+{"id":"to-adv-d-009","input":{"description":"one-liner: check if tester role already exists in roles.json"},"label":"direct"}
+{"id":"to-adv-d-010","input":{"description":"trim trailing whitespace in analyst-notes.md"},"label":"direct"}
+{"id":"to-adv-s-001","input":{"description":"spike on whether using a worker pool is faster"},"label":"subagent"}
+{"id":"to-adv-s-002","input":{"description":"research how team topology patterns map to our repos"},"label":"subagent"}
+{"id":"to-adv-s-003","input":{"description":"investigate flaky test in reviewer-approval.spec.ts"},"label":"subagent"}
+{"id":"to-adv-s-004","input":{"description":"crawl docs to find the canonical researcher role definition"},"label":"subagent"}
+{"id":"to-adv-s-005","input":{"description":"explore tradeoffs between single lead vs rotating lead approach"},"label":"subagent"}
+{"id":"to-adv-s-006","input":{"description":"background write-up summarizing pipeline runtime regressions"},"label":"subagent"}
+{"id":"to-adv-s-007","input":{"description":"sandbox-run the new tester harness to see if it boots"},"label":"subagent"}
+{"id":"to-adv-s-008","input":{"description":"fuzz the editor input field with unicode payloads"},"label":"subagent"}
+{"id":"to-adv-s-009","input":{"description":"investigate if a single worker can keep up with current throughput"},"label":"subagent"}
+{"id":"to-adv-s-010","input":{"description":"research the analyst role's responsibilities in prior projects"},"label":"subagent"}
+{"id":"to-adv-t-001","input":{"description":"split the project across 5 contributors with researcher and lead roles alongside worker-1 worker-2 worker-3","roles":["researcher","lead","worker-1","worker-2","worker-3"]},"label":"team","roles":["researcher","lead","worker-1","worker-2","worker-3"]}
+{"id":"to-adv-t-002","input":{"description":"coordinated team of researcher + analyst to spike on vendor comparison, then reviewer signs off"},"label":"team","roles":["researcher","analyst","reviewer"]}
+{"id":"to-adv-t-003","input":{"description":"fan-out indexing across worker-1 worker-2 worker-3 worker-4 worker-5 while lead monitors"},"label":"team","roles":["worker-1","worker-2","worker-3","worker-4","worker-5","lead"]}
+{"id":"to-adv-t-004","input":{"description":"editor and fact-checker collaborate with researcher to produce newsletter draft"},"label":"team","roles":["editor","fact-checker","researcher"]}
+{"id":"to-adv-t-005","input":{"description":"roster: designer, coder-1, coder-2, tester to ship onboarding flow"},"label":"team","roles":["designer","coder-1","coder-2","tester"]}
+{"id":"to-adv-t-006","input":{"description":"parallel team exploring branch-a branch-b branch-c with reviewer consolidating"},"label":"team","roles":["branch-a","branch-b","branch-c","reviewer"]}
+{"id":"to-adv-t-007","input":{"description":"spike then ship: researcher spikes, then coder-1 + coder-2 + tester pipeline takes over"},"label":"team","roles":["researcher","coder-1","coder-2","tester"]}
+{"id":"to-adv-t-008","input":{"description":"analyst + researcher + fact-checker team to vet the upstream dataset"},"label":"team","roles":["analyst","researcher","fact-checker"]}
+{"id":"to-adv-t-009","input":{"description":"three workers in parallel: worker-1 worker-2 worker-3 shard the import"},"label":"team","roles":["worker-1","worker-2","worker-3"]}
+{"id":"to-adv-t-010","input":{"description":"researcher + designer + coder-1 + reviewer pipeline for redesign"},"label":"team","roles":["researcher","designer","coder-1","reviewer"]}

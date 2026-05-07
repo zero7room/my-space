@@ -198,3 +198,43 @@
 {"id":"fc-197","input":{"message":"task cancelled mid-tool while writing artifact"},"label":"user_cancelled"}
 {"id":"fc-198","input":{"message":"user_cancelled flag set; executor exiting cleanly"},"label":"user_cancelled"}
 {"id":"fc-199","input":{"message":"POST /tasks/t_77/cancel issued by user owner@example.com"},"label":"user_cancelled"}
+{"id":"fc-adv-t-001","input":{"message":"got 502 but only after the assertion fired"},"label":"transient_error"}
+{"id":"fc-adv-t-002","input":{"message":"expected 200, got 503; retrying upstream"},"label":"transient_error"}
+{"id":"fc-adv-t-003","input":{"message":"assertion would have held but 504 gateway timeout short-circuited it"},"label":"transient_error"}
+{"id":"fc-adv-t-004","input":{"message":"429 too many requests - backoff engaged after expect() threw"},"label":"transient_error"}
+{"id":"fc-adv-t-005","input":{"message":"EAI_AGAIN dns resolution flaking; permission to retry assumed"},"label":"transient_error"}
+{"id":"fc-adv-t-006","input":{"message":"socket hang up in the middle of assert equal comparison"},"label":"transient_error"}
+{"id":"fc-adv-t-007","input":{"message":"ETIMEDOUT downloading fixture that expected to assert count==5"},"label":"transient_error"}
+{"id":"fc-adv-t-008","input":{"message":"upstream timeout before authz check could run"},"label":"transient_error"}
+{"id":"fc-adv-t-009","input":{"message":"bad gateway error on forbidden-looking URL /admin/health"},"label":"transient_error"}
+{"id":"fc-adv-t-010","input":{"message":"temporarily unavailable: provider says forbidden during incident window"},"label":"transient_error"}
+{"id":"fc-adv-a-001","input":{"message":"expected user_cancelled flag set but got false"},"label":"assertion_error"}
+{"id":"fc-adv-a-002","input":{"message":"assertion failed: expected transient_error classification, got assertion_error"},"label":"assertion_error"}
+{"id":"fc-adv-a-003","input":{"message":"AssertionError: expected body to mention 'forbidden' but it did not"},"label":"assertion_error"}
+{"id":"fc-adv-a-004","input":{"message":"expected error code to be 503 but received 200"},"label":"assertion_error"}
+{"id":"fc-adv-a-005","input":{"message":"chai: expected status to equal ETIMEDOUT fixture string, got OK"},"label":"assertion_error"}
+{"id":"fc-adv-a-006","input":{"message":"expected mock.cancelReason to be empty, was 'done'"},"label":"assertion_error"}
+{"id":"fc-adv-a-007","input":{"message":"snapshot mismatch: field 'permission' differs from golden"},"label":"assertion_error"}
+{"id":"fc-adv-a-008","input":{"message":"expected response.body.message to contain 'access denied' but it did not"},"label":"assertion_error"}
+{"id":"fc-adv-a-009","input":{"message":"assert: expected rate_limited=true, got rate_limited=false"},"label":"assertion_error"}
+{"id":"fc-adv-a-010","input":{"message":"AssertionError: 502 was expected; request instead returned 200 OK"},"label":"assertion_error"}
+{"id":"fc-adv-p-001","input":{"message":"permission_error: task aborted by sandbox: tried to read /etc/shadow"},"label":"permission_error"}
+{"id":"fc-adv-p-002","input":{"message":"permission_error: cross-tenant leak blocked mid-crawl"},"label":"permission_error"}
+{"id":"fc-adv-p-003","input":{"message":"permission_error: 403 after retry exhausted (had been 503 for 30s)"},"label":"permission_error"}
+{"id":"fc-adv-p-004","input":{"message":"RBAC denied write despite assertion that caller is owner"},"label":"permission_error"}
+{"id":"fc-adv-p-005","input":{"message":"EACCES opening /var/log/system.log (tool had expected success)"},"label":"permission_error"}
+{"id":"fc-adv-p-006","input":{"message":"jwt signature invalid; token had expected aud claim but hmac mismatch"},"label":"permission_error"}
+{"id":"fc-adv-p-007","input":{"message":"permission_error: client cert rejected by upstream after 504 retry"},"label":"permission_error"}
+{"id":"fc-adv-p-008","input":{"message":"sandbox escape attempt blocked (assertion on path.startsWith triggered the refusal)"},"label":"permission_error"}
+{"id":"fc-adv-p-009","input":{"message":"insufficient scope: expected 'tasks:write', token carried 'tasks:read'"},"label":"permission_error"}
+{"id":"fc-adv-p-010","input":{"message":"permission_error: signed url expired during long-poll; no retry allowed"},"label":"permission_error"}
+{"id":"fc-adv-u-001","input":{"message":"operator cancelled mid-503 retry"},"label":"user_cancelled"}
+{"id":"fc-adv-u-002","input":{"message":"user cancelled while permission check was still pending"},"label":"user_cancelled"}
+{"id":"fc-adv-u-003","input":{"message":"SIGINT received during EACCES retry storm"},"label":"user_cancelled"}
+{"id":"fc-adv-u-004","input":{"message":"aborted by user despite retry budget remaining (ETIMEDOUT on prior attempt)"},"label":"user_cancelled"}
+{"id":"fc-adv-u-005","input":{"message":"/cancel issued by owner during 429 backoff window"},"label":"user_cancelled"}
+{"id":"fc-adv-u-006","input":{"message":"user_cancelled right as assertion error surfaced"},"label":"user_cancelled"}
+{"id":"fc-adv-u-007","input":{"message":"pressed Ctrl-C after a forbidden 403 from upstream"},"label":"user_cancelled"}
+{"id":"fc-adv-u-008","input":{"message":"client cancelled: request had been returning 503 for 90s"},"label":"user_cancelled"}
+{"id":"fc-adv-u-009","input":{"message":"manually stopped by operator; last status was bad gateway"},"label":"user_cancelled"}
+{"id":"fc-adv-u-010","input":{"message":"owner cancelled while access denied was being investigated"},"label":"user_cancelled"}

@@ -77,7 +77,14 @@ interface Row {
 describe('TeamOrchestration eval', () => {
   it('classifies into direct/subagent/team and extracts team roles meeting acceptance #67', () => {
     const rows = loadJsonlDataset<Row>(DATASET);
-    expect(rows.length).toBe(150);
+    expect(rows.length).toBeGreaterThanOrEqual(150);
+    const perLabel = rows.reduce<Record<string, number>>((acc, r) => {
+      acc[r.label] = (acc[r.label] ?? 0) + 1;
+      return acc;
+    }, {});
+    for (const label of ['direct', 'subagent', 'team']) {
+      expect(perLabel[label] ?? 0).toBeGreaterThanOrEqual(50);
+    }
 
     const preds = rows.map((r) => pick(r.input.description));
     const predRoles = rows.map((r) => pickRoles(r.input.description));
