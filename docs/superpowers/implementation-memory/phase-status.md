@@ -6,7 +6,7 @@
 
 ## Current Phase
 
-Phase 2: Filesystem Store — PENDING
+Phase 3: Runtime Repositories + Recovery — PENDING
 
 ## Completed Phases
 
@@ -32,13 +32,29 @@ Modules:
 - `packages/contracts/src/api/` — API route table + DTO schemas + OWNER_FIRST_ACTIONS
 - `packages/contracts/src/sanitize.ts` — sanitizeText() identity stub (Phase 11 hardens)
 
-Deferred: none for Phase 1. Sanitizer hardening tracked for Phase 11.
+### Phase 2: Filesystem Store + Transactions — 2026-05-07
+
+Verification:
+- `pnpm --filter @ai-workflow/fs-store build` → ok
+- `pnpm --filter @ai-workflow/fs-store test` → 27 passed (4 files)
+- `pnpm -r build` / `test` / `lint` → green
+
+Modules:
+- `errors.ts` — typed errors (PathOutsideRoot, TransactionPreparedOnly, LockNotAcquired, ExclusiveCreateConflict, StaleLease, FsStoreError).
+- `paths.ts` — `InstancePaths` covering every path under `data/instances/<runtimeId>/...` from design.md §8 + `safeRelativePath`.
+- `primitives.ts` — atomicWriteJson (tmp+fsync+rename+dir-fsync), readJson (sync/async), exclusiveCreateJson (O_CREAT|O_EXCL), appendJsonl, readJsonl (tolerates partial trailing line), atomicRename, sha256File/Stream, listJsonFilesSorted, listSubdirsSorted, removeIfExists, cleanupTmpOrphans.
+- `keyed-mutex.ts` — in-process per-key mutex.
+- `jsonl.ts` — appendEvent (auto-assigns monotonic seq + event id) + readEventsSince.
+- `transactions.ts` — Transactions class with prepare/commit/rollback/recover. Operations: write, append, rename, delete. Recovery rolls back prepared, replays committed (idempotent), leaves rolledback.
+- `locks.ts` — acquireInstanceLock (O_CREAT|O_EXCL with stale-detection rename to `*.stale.<token>`), refreshInstanceLock, releaseInstanceLock, LeaseManager.
+
+Deferred: instance-level recovery scan composition (Phase 3).
 
 ## Phase Index
 
 - [x] Phase 0: Repository Scaffold
 - [x] Phase 1: Contracts, IDs, Schemas, State Machines
-- [ ] Phase 2: Filesystem Store, Transactions
+- [x] Phase 2: Filesystem Store, Transactions
 - [ ] Phase 3: Runtime Repositories, Recovery Scan
 - [ ] Phase 4: Fastify API, Auth, SSE
 - [ ] Phase 5: ThreadLoop, MessageGuard, Task Confirmation, Plan Revision
