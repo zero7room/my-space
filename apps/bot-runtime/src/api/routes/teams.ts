@@ -1,11 +1,35 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 
 import type { RuntimePaths } from '../../runtime/paths.js';
+import type { SseRegistry } from '../../runtime/sse/index.js';
 import type { TaskIndex } from '../../runtime/task-index.js';
 
 interface Deps {
   rt: RuntimePaths;
   taskIndex: TaskIndex;
+  sse?: SseRegistry;
+}
+
+async function denyAction(
+  deps: Deps,
+  threadId: string,
+  taskId: string,
+  requestedAction: string,
+  reason: 'not_owner' | 'terminal_state' | 'invalid_state',
+  requestedByUserId: string,
+): Promise<void> {
+  try {
+    const ev = await deps.rt.tasks.appendEvent(threadId, taskId, {
+      kind: 'task_action_denied',
+      taskId,
+      threadId,
+      payload: { requestedAction, reason, requestedByUserId },
+      at: new Date().toISOString(),
+    });
+    if (deps.sse) deps.sse.publish(ev);
+  } catch {
+    /* best-effort audit */
+  }
 }
 
 async function loadTaskOwnerThread(
@@ -13,12 +37,16 @@ async function loadTaskOwnerThread(
   taskId: string,
   req: FastifyRequest,
   reply: FastifyReply,
+  requestedAction?: string,
 ): Promise<{ threadId: string; ownerOk: boolean } | undefined> {
   const indexed = deps.taskIndex.threadFor(taskId);
   if (indexed) {
     const got = await deps.rt.tasks.get(indexed, taskId);
     if (got) {
       if (got.ownerUserId !== req.auth!.user.id) {
+        if (requestedAction) {
+          await denyAction(deps, indexed, taskId, requestedAction, 'not_owner', req.auth!.user.id);
+        }
         reply.code(403).send({ error: { code: 'forbidden' } });
         return { threadId: indexed, ownerOk: false };
       }
@@ -31,6 +59,9 @@ async function loadTaskOwnerThread(
     if (!got) continue;
     await deps.taskIndex.note(taskId, t.id);
     if (got.ownerUserId !== req.auth!.user.id) {
+      if (requestedAction) {
+        await denyAction(deps, t.id, taskId, requestedAction, 'not_owner', req.auth!.user.id);
+      }
       reply.code(403).send({ error: { code: 'forbidden' } });
       return { threadId: t.id, ownerOk: false };
     }
@@ -137,10 +168,27 @@ export function registerTeamRoutes(
     app.post<{ Params: { taskId: string; teamId: string } }>(
       `/api/tasks/:taskId/teams/:teamId/${verb}`,
       async (req, reply) => {
-        const r = await loadTaskOwnerThread(deps, req.params.taskId, req, reply);
+        const r = await loadTaskOwnerThread(deps, req.params.taskId, req, reply, 'team_cancel');
         if (!r || !r.ownerOk) return;
         const team = await deps.rt.teams.getTeam(r.threadId, req.params.taskId, req.params.teamId);
         if (!team) return reply.code(404).send({ error: { code: 'not_found' } });
+        if (
+          team.status === 'completed' ||
+          team.status === 'failed' ||
+          team.status === 'cancelled'
+        ) {
+          await denyAction(
+            deps,
+            r.threadId,
+            req.params.taskId,
+            'team_cancel',
+            'terminal_state',
+            req.auth!.user.id,
+          );
+          return reply.code(409).send({
+            error: { code: 'terminal_state', message: `team is ${team.status}` },
+          });
+        }
         await deps.rt.teams.saveTeam({ ...team, status: 'cancelled' });
         return { ok: true };
       },
@@ -153,7 +201,8 @@ export function registerTeamRoutes(
     }>(
       `/api/tasks/:taskId/teams/:teamId/teammates/:teammateId/${decision}`,
       async (req, reply) => {
-        const r = await loadTaskOwnerThread(deps, req.params.taskId, req, reply);
+        const requestedAction = decision === 'approve' ? 'teammate_approve' : 'teammate_reject';
+        const r = await loadTaskOwnerThread(deps, req.params.taskId, req, reply, requestedAction);
         if (!r || !r.ownerOk) return;
         // Phase 9 wires the teammate critical-node decision; v1 boundary acks.
         return { ok: true };

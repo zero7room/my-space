@@ -25,6 +25,7 @@ import * as fs from 'node:fs/promises';
 import path from 'node:path';
 
 import { TokenAuthService, parseLocalUserTokens } from '../auth/user-token.js';
+import { CriticalNodePolicyEngine } from '../critical-node/index.js';
 import { RuntimeMetrics } from '../metrics/index.js';
 import { RuntimePaths } from '../runtime/paths.js';
 import { RecoveryScanner } from '../runtime/recovery.js';
@@ -58,6 +59,7 @@ export interface ServerHandle {
   rt: RuntimePaths;
   sse: SseRegistry;
   taskIndex: TaskIndex;
+  policyEngine: CriticalNodePolicyEngine;
   lock?: InstanceLockHolder;
   close(): Promise<void>;
 }
@@ -163,9 +165,13 @@ export async function createServer(cfg: ServerConfig): Promise<ServerHandle> {
   registerTaskRoutes(app, { rt, sse, taskIndex });
   registerArtifactRoutes(app, { rt });
   registerChannelRoutes(app, { rt });
-  registerPolicyRoutes(app, { rt });
+  // Shared CriticalNodePolicyEngine — kept in sync by the policies routes so
+  // CRUD changes apply on the next tool dispatch without a restart (#12).
+  const policyEngine = new CriticalNodePolicyEngine();
+  policyEngine.setPolicies(await rt.policies.list());
+  registerPolicyRoutes(app, { rt, engine: policyEngine });
   registerSkillRoutes(app, { rt, registry: skillRegistry });
-  registerTeamRoutes(app, { rt, taskIndex });
+  registerTeamRoutes(app, { rt, sse, taskIndex });
 
   const ackSweeper = new AckSweeper({ sse, intervalMs: 10_000 });
   const dedupeReaper = new DedupeReaper({
@@ -182,6 +188,7 @@ export async function createServer(cfg: ServerConfig): Promise<ServerHandle> {
     rt,
     sse,
     taskIndex,
+    policyEngine,
     lock,
     async close() {
       ackSweeper.stop();
