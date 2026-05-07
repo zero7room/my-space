@@ -21,6 +21,24 @@ export class AckSweeper {
     const now = (this.opts.now ?? (() => new Date().toISOString()))();
     let emitted = 0;
     for (const [threadId, bus] of this.opts.sse.threadEntries()) {
+      // Surface any buffer-eviction since the last sweep so clients know to
+      // fall back to the full reload path (acceptance #41).
+      const trunc = bus.drainTruncation();
+      if (trunc) {
+        bus.publish({
+          id: newEventId(),
+          seq: (bus.bufferTail()?.seq ?? 0) + 1,
+          kind: 'sse_replay_truncated',
+          threadId,
+          payload: {
+            reason: trunc.reason,
+            droppedEventCount: trunc.droppedEventCount,
+            oldestRetainedEventId: trunc.oldestRetainedEventId,
+          },
+          at: now,
+        });
+        emitted++;
+      }
       for (const miss of bus.checkAckTimeouts()) {
         bus.publish({
           id: newEventId(),

@@ -63,6 +63,33 @@ export class OutboundJobProcessor {
         this.opts.throttle &&
         !this.opts.throttle.consume(j.provider, externalId)
       ) {
+        // Best-effort notify_throttled diagnostic so operators see suppression
+        // (acceptance #43). The surface is a per-(provider, target) jsonl in
+        // the diagnostics root; metric increment is the operator-facing path.
+        try {
+          const fsm = await import('node:fs/promises');
+          const pathMod = await import('node:path');
+          const dir = pathMod.join(rt.paths.diagnosticsRoot(), 'notify-throttled');
+          await fsm.mkdir(dir, { recursive: true });
+          const file = pathMod.join(
+            dir,
+            `${j.provider}-${externalId.replace(/[^a-zA-Z0-9_-]/g, '_')}.jsonl`,
+          );
+          await fsm.appendFile(
+            file,
+            JSON.stringify({
+              kind: 'notify_throttled',
+              providerId: j.provider,
+              target: externalId,
+              taskId: j.payload['taskId'] ?? null,
+              notificationKind: j.payload['notificationKind'] ?? null,
+              reason: 'duplicate_retry_window',
+              at: new Date().toISOString(),
+            }) + '\n',
+          );
+        } catch {
+          /* best-effort */
+        }
         // Drop — caller decides whether to enqueue retry.
         const updated = channelJobSchema.parse({
           ...j,

@@ -49,6 +49,9 @@ export class ThreadEventBus {
   private readonly subs = new Set<Subscriber>();
   private readonly lastAckBySub = new Map<string, { ackedSeq: number; at: number }>();
   private hasActiveTeam = false;
+  private lastTruncation:
+    | { reason: 'buffer_overflow' | 'max_age_reached'; droppedEventCount: number; oldestRetainedEventId?: string }
+    | undefined;
 
   constructor(private readonly cfg: SseConfig = DEFAULT_SSE_CONFIG) {}
 
@@ -182,15 +185,53 @@ export class ThreadEventBus {
 
   private evictByCap(): void {
     const cap = this.cap();
-    while (this.buffer.length > cap) this.buffer.shift();
+    let dropped = 0;
+    let oldest: number | undefined;
+    while (this.buffer.length > cap) {
+      const ev = this.buffer.shift();
+      if (ev) {
+        dropped++;
+        if (oldest === undefined) oldest = ev.event.seq;
+      }
+    }
+    if (dropped > 0) {
+      this.lastTruncation = {
+        reason: 'buffer_overflow',
+        droppedEventCount: dropped,
+        oldestRetainedEventId: this.buffer[0]?.event.id,
+      };
+    }
   }
 
   private evictByAge(): void {
     const now = (this.cfg.now ?? Date.now)();
     const minTs = now - this.cfg.maxAgeSec * 1000;
+    let dropped = 0;
     while (this.buffer.length > 0 && this.buffer[0]!.ts < minTs) {
       this.buffer.shift();
+      dropped++;
     }
+    if (dropped > 0) {
+      this.lastTruncation = {
+        reason: 'max_age_reached',
+        droppedEventCount: dropped,
+        oldestRetainedEventId: this.buffer[0]?.event.id,
+      };
+    }
+  }
+
+  /**
+   * Returns and clears the most-recent truncation summary so callers (e.g. the
+   * ack-sweeper) can synthesize an `sse_replay_truncated` envelope. Per
+   * acceptance #41 the sweep is responsible for publishing the synthetic
+   * event; the bus only records the side-effect.
+   */
+  drainTruncation():
+    | { reason: 'buffer_overflow' | 'max_age_reached'; droppedEventCount: number; oldestRetainedEventId?: string }
+    | undefined {
+    const t = this.lastTruncation;
+    this.lastTruncation = undefined;
+    return t;
   }
 }
 

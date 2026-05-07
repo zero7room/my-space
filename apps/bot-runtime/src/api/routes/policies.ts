@@ -8,11 +8,29 @@ import {
   criticalNodePolicySchema,
 } from '@ai-workflow/contracts';
 
+import type { CriticalNodePolicyEngine } from '../../critical-node/index.js';
 import type { RuntimePaths } from '../../runtime/paths.js';
+
+interface PolicyDeps {
+  rt: RuntimePaths;
+  /**
+   * Optional in-memory engine to keep in sync with the on-disk repo. When
+   * provided, every CRUD action triggers `engine.setPolicies(await
+   * rt.policies.list())` so new policies take effect on the next tool dispatch
+   * without a runtime restart (acceptance #12).
+   */
+  engine?: CriticalNodePolicyEngine;
+}
+
+async function reloadEngine(deps: PolicyDeps): Promise<void> {
+  if (!deps.engine) return;
+  const all = await deps.rt.policies.list();
+  deps.engine.setPolicies(all);
+}
 
 export function registerPolicyRoutes(
   app: FastifyInstance,
-  deps: { rt: RuntimePaths },
+  deps: PolicyDeps,
 ): void {
   app.get('/api/critical-node-policies', async () => {
     const policies = await deps.rt.policies.list();
@@ -35,6 +53,7 @@ export function registerPolicyRoutes(
       ownerUserId: req.auth!.user.id,
     });
     await deps.rt.policies.save(policy);
+    await reloadEngine(deps);
     return { policy };
   });
 
@@ -56,6 +75,7 @@ export function registerPolicyRoutes(
       const next: CriticalNodePolicy = { ...cur, ...parsed.data };
       const validated = criticalNodePolicySchema.parse(next);
       await deps.rt.policies.save(validated);
+      await reloadEngine(deps);
       return { policy: validated };
     },
   );
@@ -70,6 +90,7 @@ export function registerPolicyRoutes(
         return reply.code(403).send({ error: { code: 'forbidden' } });
       }
       await deps.rt.policies.delete(req.params.policyId);
+      await reloadEngine(deps);
       return { ok: true };
     },
   );
