@@ -3,6 +3,7 @@ import * as React from 'react';
 import type { TaskActionResponse } from '@ai-workflow/contracts';
 import { api } from '../../lib/api-client';
 import { cn } from '../../lib/cn';
+import { useTasksStore } from '../../lib/stores/tasks';
 
 type ArtifactLike = {
   id: string;
@@ -40,6 +41,7 @@ export function ArtifactPanel(props: { taskId: string }): React.JSX.Element {
   const [previewData, setPreviewData] = React.useState<
     Record<string, unknown>
   >({});
+  const drifted = useTasksStore((s) => s.driftedArtifacts);
 
   const refresh = React.useCallback(async () => {
     setErr(null);
@@ -146,76 +148,81 @@ export function ArtifactPanel(props: { taskId: string }): React.JSX.Element {
         </div>
       ) : null}
       <ul className="flex flex-col gap-2">
-        {items.map((a) => (
-          <li
-            key={a.id}
-            className={cn(
-              'rounded-card border bg-surface px-3 py-2 shadow-soft',
-              a.drifted ? 'border-danger border-2' : 'border-border',
-            )}
-          >
-            {a.drifted ? (
-              <div className="mb-2 rounded-card bg-danger/10 px-2 py-1 text-xs text-danger">
-                sha256 不一致：与上一次校验结果不同，请检查产物是否被外部修改。
-              </div>
-            ) : null}
-            <div className="flex items-center gap-2">
-              <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
-                {a.relativePath}
-              </span>
-              <span
-                className={cn(
-                  'flex-none rounded-pill px-2 py-0.5 text-xs',
-                  a.status === 'archived'
-                    ? 'bg-muted/10 text-muted'
-                    : 'bg-success/15 text-success',
-                )}
-              >
-                {a.status === 'archived' ? '已归档' : '激活'}
-              </span>
-            </div>
-            <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted">
-              <span>sha256 {shortSha(a.sha256)}</span>
-              {a.sizeBytes !== undefined ? (
-                <span>{formatSize(a.sizeBytes)}</span>
+        {items.map((a) => {
+          const driftReason = drifted[a.id];
+          const isDrifted = a.drifted || Boolean(driftReason);
+          return (
+            <li
+              key={a.id}
+              className={cn(
+                'rounded-card border bg-surface px-3 py-2 shadow-soft',
+                isDrifted ? 'border-danger border-2' : 'border-border',
+              )}
+            >
+              {isDrifted ? (
+                <div className="mb-2 rounded-card bg-danger/10 px-2 py-1 text-xs text-danger">
+                  {driftReason ??
+                    'sha256 不一致：与上一次校验结果不同，请检查产物是否被外部修改。'}
+                </div>
               ) : null}
-            </div>
-            <div className="mt-2 flex items-center gap-2 text-xs">
-              <button
-                type="button"
-                onClick={() => void handlePreview(a.id)}
-                className="rounded-pill border border-border bg-surface px-2 py-1 text-foreground transition hover:-translate-y-px hover:text-accent"
-              >
-                {previewId === a.id ? '收起预览' : '预览'}
-              </button>
-              <button
-                type="button"
-                disabled
-                title="v1 暂未实现下载链路"
-                className="cursor-not-allowed rounded-pill border border-border bg-surface px-2 py-1 text-muted opacity-60"
-              >
-                下载
-              </button>
-              <button
-                type="button"
-                onClick={() => void handleReseal(a.id)}
-                disabled={busy === a.id}
-                className="rounded-pill border border-border bg-surface px-2 py-1 text-foreground transition hover:-translate-y-px hover:text-accent disabled:opacity-50"
-              >
-                {busy === a.id ? '重算中…' : '重算 sha256'}
-              </button>
-            </div>
-            {previewId === a.id ? (
-              <pre className="mt-2 max-h-64 overflow-auto rounded-card bg-surface-strong p-2 text-xs text-foreground">
-                {JSON.stringify(
-                  previewData[a.id] ?? { loading: true },
-                  null,
-                  2,
-                )}
-              </pre>
-            ) : null}
-          </li>
-        ))}
+              <div className="flex items-center gap-2">
+                <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
+                  {a.relativePath}
+                </span>
+                <span
+                  className={cn(
+                    'flex-none rounded-pill px-2 py-0.5 text-xs',
+                    a.status === 'archived'
+                      ? 'bg-muted/10 text-muted'
+                      : 'bg-success/15 text-success',
+                  )}
+                >
+                  {a.status === 'archived' ? '已归档' : '激活'}
+                </span>
+              </div>
+              <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted">
+                <span>sha256 {shortSha(a.sha256)}</span>
+                {a.sizeBytes !== undefined ? (
+                  <span>{formatSize(a.sizeBytes)}</span>
+                ) : null}
+              </div>
+              <div className="mt-2 flex items-center gap-2 text-xs">
+                <button
+                  type="button"
+                  onClick={() => void handlePreview(a.id)}
+                  className="rounded-pill border border-border bg-surface px-2 py-1 text-foreground transition hover:-translate-y-px hover:text-accent"
+                >
+                  {previewId === a.id ? '收起预览' : '预览'}
+                </button>
+                <button
+                  type="button"
+                  disabled
+                  title="v1 暂未实现下载链路"
+                  className="cursor-not-allowed rounded-pill border border-border bg-surface px-2 py-1 text-muted opacity-60"
+                >
+                  下载
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleReseal(a.id)}
+                  disabled={busy === a.id}
+                  className="rounded-pill border border-border bg-surface px-2 py-1 text-foreground transition hover:-translate-y-px hover:text-accent disabled:opacity-50"
+                >
+                  {busy === a.id ? '重算中…' : '重算 sha256'}
+                </button>
+              </div>
+              {previewId === a.id ? (
+                <pre className="mt-2 max-h-64 overflow-auto rounded-card bg-surface-strong p-2 text-xs text-foreground">
+                  {JSON.stringify(
+                    previewData[a.id] ?? { loading: true },
+                    null,
+                    2,
+                  )}
+                </pre>
+              ) : null}
+            </li>
+          );
+        })}
       </ul>
     </section>
   );
