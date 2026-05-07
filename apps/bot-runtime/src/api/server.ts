@@ -137,12 +137,14 @@ export async function createServer(cfg: ServerConfig): Promise<ServerHandle> {
     origin: true,
   });
 
-  // Auth preHandler. Every route except /api/runtime/health and the Feishu
+  // Auth preHandler. Every route except /api/runtime/health,
+  // /api/runtime/metrics (Prometheus scrape target) and the Feishu
   // webhook requires a valid bearer.
   app.addHook('preHandler', async (req, reply) => {
     const url = req.routeOptions.url ?? req.url;
     if (
       url === '/api/runtime/health' ||
+      url === '/api/runtime/metrics' ||
       url === '/api/channels/feishu/webhook'
     ) {
       return;
