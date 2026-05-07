@@ -1,0 +1,60 @@
+@import "tailwindcss";
+
+@theme {
+  --color-background: #f6f0e6;
+  --color-foreground: #2e2823;
+  --color-surface: #fffaf3;
+  --color-surface-strong: #f5ebe0;
+  --color-surface-raised: rgba(255, 255, 255, 0.86);
+  --color-border: rgba(122, 92, 61, 0.16);
+  --color-muted: #8d7865;
+  --color-accent: #d88f55;
+  --color-accent-soft: rgba(216, 143, 85, 0.14);
+  --color-success: #3c8c63;
+  --color-warning: #c99335;
+  --color-danger: #bc5a4c;
+  --color-user-bubble: #f2dfcb;
+
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --radius-pill: 999px;
+  --radius-panel: 1.35rem;
+  --radius-card: 1.2rem;
+
+  --shadow-soft: 0 8px 18px rgba(90, 68, 42, 0.06);
+  --shadow-medium: 0 12px 26px rgba(90, 68, 42, 0.06);
+  --shadow-raised: 0 12px 28px rgba(90, 68, 42, 0.05);
+  --shadow-drawer: -20px 0 60px rgba(90, 68, 42, 0.08);
+}
+
+:root {
+  color-scheme: light;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+  background:
+    radial-gradient(circle at top right, rgba(216, 143, 85, 0.12), transparent 24%),
+    radial-gradient(circle at top left, rgba(188, 90, 76, 0.06), transparent 18%),
+    var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* label style used in xuedian reference — small uppercase tracked label */
+.u-label {
+  font-size: 11px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+/* scrollbar consistent across drawer + chat */
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-thumb { background: rgba(122, 92, 61, 0.2); border-radius: 10px; }
+*::-webkit-scrollbar-thumb:hover { background: rgba(122, 92, 61, 0.35); }
+*::-webkit-scrollbar-track { background: transparent; }
