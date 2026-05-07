@@ -6,7 +6,7 @@
 
 ## Current Phase
 
-Phase 3: Runtime Repositories + Recovery — PENDING
+Phase 4: Fastify API + Auth + SSE — PENDING
 
 ## Completed Phases
 
@@ -17,45 +17,33 @@ Phase 3: Runtime Repositories + Recovery — PENDING
 
 ### Phase 1: Contracts, IDs, Schemas, State Machines — 2026-05-07
 
-Verification:
-- `pnpm --filter @ai-workflow/contracts build` → ok
-- `pnpm --filter @ai-workflow/contracts test` → 45 passed (3 files)
-- `pnpm -r build` → all packages build green
-- `pnpm -r test` → contracts: 45 pass; others: passWithNoTests
-- `pnpm lint` → ok
-
-Modules:
-- `packages/contracts/src/ids.ts` — id prefixes, factories, runtimeId regex
-- `packages/contracts/src/states.ts` — Task / Plan / Thread / ChannelBinding / Retry / OutboundJob / Team / Teammate / TeamWorkItem state machines
-- `packages/contracts/src/schemas.ts` — Zod schemas for every durable record + canTransition* guards + applyTaskTransition
-- `packages/contracts/src/events/` — durable event kinds + envelope + SSE frame
-- `packages/contracts/src/api/` — API route table + DTO schemas + OWNER_FIRST_ACTIONS
-- `packages/contracts/src/sanitize.ts` — sanitizeText() identity stub (Phase 11 hardens)
+Verification: contracts 45 pass, all green.
 
 ### Phase 2: Filesystem Store + Transactions — 2026-05-07
 
+Verification: fs-store 27 pass, all green.
+
+### Phase 3: Runtime Repositories + Recovery — 2026-05-07
+
 Verification:
-- `pnpm --filter @ai-workflow/fs-store build` → ok
-- `pnpm --filter @ai-workflow/fs-store test` → 27 passed (4 files)
-- `pnpm -r build` / `test` / `lint` → green
+- `pnpm --filter @ai-workflow/bot-runtime build` → ok
+- `pnpm --filter @ai-workflow/bot-runtime test` → 14 passed (2 files)
+- `pnpm -r build` / `test` (86 total) / `lint` → green
 
 Modules:
-- `errors.ts` — typed errors (PathOutsideRoot, TransactionPreparedOnly, LockNotAcquired, ExclusiveCreateConflict, StaleLease, FsStoreError).
-- `paths.ts` — `InstancePaths` covering every path under `data/instances/<runtimeId>/...` from design.md §8 + `safeRelativePath`.
-- `primitives.ts` — atomicWriteJson (tmp+fsync+rename+dir-fsync), readJson (sync/async), exclusiveCreateJson (O_CREAT|O_EXCL), appendJsonl, readJsonl (tolerates partial trailing line), atomicRename, sha256File/Stream, listJsonFilesSorted, listSubdirsSorted, removeIfExists, cleanupTmpOrphans.
-- `keyed-mutex.ts` — in-process per-key mutex.
-- `jsonl.ts` — appendEvent (auto-assigns monotonic seq + event id) + readEventsSince.
-- `transactions.ts` — Transactions class with prepare/commit/rollback/recover. Operations: write, append, rename, delete. Recovery rolls back prepared, replays committed (idempotent), leaves rolledback.
-- `locks.ts` — acquireInstanceLock (O_CREAT|O_EXCL with stale-detection rename to `*.stale.<token>`), refreshInstanceLock, releaseInstanceLock, LeaseManager.
+- `apps/bot-runtime/src/runtime/repositories/` — User, Thread (transcript+drafts+guard log), Task+TaskList, Plan+PlanRevision, Artifact+ChangeRecord, ChannelConfig+Binding+Event+Job (chat-claims via O_EXCL), CriticalNodePolicy, Team (work-items/messages/teammates), RuntimeInfo.
+- `apps/bot-runtime/src/runtime/paths.ts` — `RuntimePaths` composes InstancePaths + all repos.
+- `apps/bot-runtime/src/runtime/migrations/task-retry-state.ts` — v1→v2 task migration with default `TaskRetryState`.
+- `apps/bot-runtime/src/runtime/recovery.ts` — startup recovery scan: tmp cleanup, transactions, schemaVersion migration, stale running→blocked, TaskList repair, locked→pending job requeue, retry-scheduler stale lock rename, team status reconciliation, diagnostics jsonl.
 
-Deferred: instance-level recovery scan composition (Phase 3).
+Deferred: instance lock acquisition is in fs-store (`acquireInstanceLock`); Phase 4 wires it into the API server boot.
 
 ## Phase Index
 
 - [x] Phase 0: Repository Scaffold
 - [x] Phase 1: Contracts, IDs, Schemas, State Machines
 - [x] Phase 2: Filesystem Store, Transactions
-- [ ] Phase 3: Runtime Repositories, Recovery Scan
+- [x] Phase 3: Runtime Repositories, Recovery Scan
 - [ ] Phase 4: Fastify API, Auth, SSE
 - [ ] Phase 5: ThreadLoop, MessageGuard, Task Confirmation, Plan Revision
 - [ ] Phase 6: Executor, Runtime Loop, Tools, Skills, CriticalNodePolicy
