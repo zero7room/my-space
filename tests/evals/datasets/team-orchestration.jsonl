@@ -1,40 +1,150 @@
-{"id":"to-0-0","input":{"description":"tiny read-file edit"},"label":"direct"}
-{"id":"to-0-1","input":{"description":"answer a factoid"},"label":"direct"}
-{"id":"to-0-2","input":{"description":"single str_replace fix"},"label":"direct"}
-{"id":"to-0-3","input":{"description":"one-off write_file"},"label":"direct"}
-{"id":"to-0-4","input":{"description":"kick off a quick research spike"},"label":"subagent"}
-{"id":"to-0-5","input":{"description":"crawl a website for data"},"label":"subagent"}
-{"id":"to-0-6","input":{"description":"fuzz a specific function"},"label":"subagent"}
-{"id":"to-0-7","input":{"description":"build feature with researcher + coder-1 + reviewer"},"label":"team"}
-{"id":"to-0-8","input":{"description":"parallelize data collection with 4 workers"},"label":"team"}
-{"id":"to-0-9","input":{"description":"author + editor + fact-checker pipeline"},"label":"team"}
-{"id":"to-1-0","input":{"description":"tiny read-file edit"},"label":"direct"}
-{"id":"to-1-1","input":{"description":"answer a factoid"},"label":"direct"}
-{"id":"to-1-2","input":{"description":"single str_replace fix"},"label":"direct"}
-{"id":"to-1-3","input":{"description":"one-off write_file"},"label":"direct"}
-{"id":"to-1-4","input":{"description":"kick off a quick research spike"},"label":"subagent"}
-{"id":"to-1-5","input":{"description":"crawl a website for data"},"label":"subagent"}
-{"id":"to-1-6","input":{"description":"fuzz a specific function"},"label":"subagent"}
-{"id":"to-1-7","input":{"description":"build feature with researcher + coder-1 + reviewer"},"label":"team"}
-{"id":"to-1-8","input":{"description":"parallelize data collection with 4 workers"},"label":"team"}
-{"id":"to-1-9","input":{"description":"author + editor + fact-checker pipeline"},"label":"team"}
-{"id":"to-2-0","input":{"description":"tiny read-file edit"},"label":"direct"}
-{"id":"to-2-1","input":{"description":"answer a factoid"},"label":"direct"}
-{"id":"to-2-2","input":{"description":"single str_replace fix"},"label":"direct"}
-{"id":"to-2-3","input":{"description":"one-off write_file"},"label":"direct"}
-{"id":"to-2-4","input":{"description":"kick off a quick research spike"},"label":"subagent"}
-{"id":"to-2-5","input":{"description":"crawl a website for data"},"label":"subagent"}
-{"id":"to-2-6","input":{"description":"fuzz a specific function"},"label":"subagent"}
-{"id":"to-2-7","input":{"description":"build feature with researcher + coder-1 + reviewer"},"label":"team"}
-{"id":"to-2-8","input":{"description":"parallelize data collection with 4 workers"},"label":"team"}
-{"id":"to-2-9","input":{"description":"author + editor + fact-checker pipeline"},"label":"team"}
-{"id":"to-3-0","input":{"description":"tiny read-file edit"},"label":"direct"}
-{"id":"to-3-1","input":{"description":"answer a factoid"},"label":"direct"}
-{"id":"to-3-2","input":{"description":"single str_replace fix"},"label":"direct"}
-{"id":"to-3-3","input":{"description":"one-off write_file"},"label":"direct"}
-{"id":"to-3-4","input":{"description":"kick off a quick research spike"},"label":"subagent"}
-{"id":"to-3-5","input":{"description":"crawl a website for data"},"label":"subagent"}
-{"id":"to-3-6","input":{"description":"fuzz a specific function"},"label":"subagent"}
-{"id":"to-3-7","input":{"description":"build feature with researcher + coder-1 + reviewer"},"label":"team"}
-{"id":"to-3-8","input":{"description":"parallelize data collection with 4 workers"},"label":"team"}
-{"id":"to-3-9","input":{"description":"author + editor + fact-checker pipeline"},"label":"team"}
+{"id":"to-d-001","input":{"description":"fix typo in README.md"},"label":"direct"}
+{"id":"to-d-002","input":{"description":"rename variable foo to bar in utils.ts"},"label":"direct"}
+{"id":"to-d-003","input":{"description":"remove unused import from server.js"},"label":"direct"}
+{"id":"to-d-004","input":{"description":"add console.log temporary debug to auth handler"},"label":"direct"}
+{"id":"to-d-005","input":{"description":"answer factoid: how many ports does docker expose by default"},"label":"direct"}
+{"id":"to-d-006","input":{"description":"single str_replace fix for null pointer"},"label":"direct"}
+{"id":"to-d-007","input":{"description":"bump dependency lodash to 4.17.21"},"label":"direct"}
+{"id":"to-d-008","input":{"description":"quick read-file to confirm config value"},"label":"direct"}
+{"id":"to-d-009","input":{"description":"add missing return statement in helper.ts"},"label":"direct"}
+{"id":"to-d-010","input":{"description":"format file with prettier"},"label":"direct"}
+{"id":"to-d-011","input":{"description":"tiny read-file edit"},"label":"direct"}
+{"id":"to-d-012","input":{"description":"answer a factoid about HTTP status 418"},"label":"direct"}
+{"id":"to-d-013","input":{"description":"single str_replace fix for typo"},"label":"direct"}
+{"id":"to-d-014","input":{"description":"one-off write_file for new constants"},"label":"direct"}
+{"id":"to-d-015","input":{"description":"update copyright year in license header"},"label":"direct"}
+{"id":"to-d-016","input":{"description":"increment version in package.json"},"label":"direct"}
+{"id":"to-d-017","input":{"description":"add a TODO comment in main.go"},"label":"direct"}
+{"id":"to-d-018","input":{"description":"delete deprecated function stub"},"label":"direct"}
+{"id":"to-d-019","input":{"description":"adjust margin in styles.css"},"label":"direct"}
+{"id":"to-d-020","input":{"description":"change log level from debug to info"},"label":"direct"}
+{"id":"to-d-021","input":{"description":"answer what is the default port for postgres"},"label":"direct"}
+{"id":"to-d-022","input":{"description":"rename file old.md to new.md"},"label":"direct"}
+{"id":"to-d-023","input":{"description":"fix off-by-one in loop counter"},"label":"direct"}
+{"id":"to-d-024","input":{"description":"add a missing semicolon"},"label":"direct"}
+{"id":"to-d-025","input":{"description":"toggle feature flag enabled to true"},"label":"direct"}
+{"id":"to-d-026","input":{"description":"update env example with new var"},"label":"direct"}
+{"id":"to-d-027","input":{"description":"correct path in import statement"},"label":"direct"}
+{"id":"to-d-028","input":{"description":"fix typo in error message string"},"label":"direct"}
+{"id":"to-d-029","input":{"description":"answer factoid: what is the size of an int in C"},"label":"direct"}
+{"id":"to-d-030","input":{"description":"single edit to bump timeout from 30 to 60 seconds"},"label":"direct"}
+{"id":"to-d-031","input":{"description":"remove debugger statement"},"label":"direct"}
+{"id":"to-d-032","input":{"description":"replace deprecated API call site"},"label":"direct"}
+{"id":"to-d-033","input":{"description":"trim trailing whitespace from file"},"label":"direct"}
+{"id":"to-d-034","input":{"description":"add null check in parseUser"},"label":"direct"}
+{"id":"to-d-035","input":{"description":"update one yaml field in ci.yml"},"label":"direct"}
+{"id":"to-d-036","input":{"description":"hardcode dev URL in config"},"label":"direct"}
+{"id":"to-d-037","input":{"description":"answer factoid about TCP three-way handshake"},"label":"direct"}
+{"id":"to-d-038","input":{"description":"single write_file to add gitignore entry"},"label":"direct"}
+{"id":"to-d-039","input":{"description":"fix a stale comment block"},"label":"direct"}
+{"id":"to-d-040","input":{"description":"rename function getUser to fetchUser"},"label":"direct"}
+{"id":"to-d-041","input":{"description":"add type annotation to parameter"},"label":"direct"}
+{"id":"to-d-042","input":{"description":"correct misspelling in CHANGELOG"},"label":"direct"}
+{"id":"to-d-043","input":{"description":"shorten variable name x_temp to x"},"label":"direct"}
+{"id":"to-d-044","input":{"description":"set default value for retries to 3"},"label":"direct"}
+{"id":"to-d-045","input":{"description":"add a single unit-test assertion"},"label":"direct"}
+{"id":"to-d-046","input":{"description":"answer factoid about Big-O of binary search"},"label":"direct"}
+{"id":"to-d-047","input":{"description":"single edit to align json indent"},"label":"direct"}
+{"id":"to-d-048","input":{"description":"replace magic number 42 with constant"},"label":"direct"}
+{"id":"to-d-049","input":{"description":"flip boolean disabled flag to false"},"label":"direct"}
+{"id":"to-d-050","input":{"description":"add a one-line console warning"},"label":"direct"}
+{"id":"to-s-001","input":{"description":"research how Next.js handles streaming SSR"},"label":"subagent"}
+{"id":"to-s-002","input":{"description":"crawl company website for product pricing data"},"label":"subagent"}
+{"id":"to-s-003","input":{"description":"fuzz the parseInput function with random byte strings"},"label":"subagent"}
+{"id":"to-s-004","input":{"description":"investigate why the integration test bar is flaky"},"label":"subagent"}
+{"id":"to-s-005","input":{"description":"explore codebase to map the auth flow end to end"},"label":"subagent"}
+{"id":"to-s-006","input":{"description":"background spike on alternative DB engines"},"label":"subagent"}
+{"id":"to-s-007","input":{"description":"produce a write-up comparing pnpm and yarn"},"label":"subagent"}
+{"id":"to-s-008","input":{"description":"sandbox-run an experiment with the new model for an hour"},"label":"subagent"}
+{"id":"to-s-009","input":{"description":"kick off a quick research spike on websockets"},"label":"subagent"}
+{"id":"to-s-010","input":{"description":"crawl public docs for Stripe API endpoints"},"label":"subagent"}
+{"id":"to-s-011","input":{"description":"fuzz a specific function with malformed inputs"},"label":"subagent"}
+{"id":"to-s-012","input":{"description":"investigate memory leak in worker process"},"label":"subagent"}
+{"id":"to-s-013","input":{"description":"research best practices for kubernetes pod security"},"label":"subagent"}
+{"id":"to-s-014","input":{"description":"explore alternative storage backends for our queue"},"label":"subagent"}
+{"id":"to-s-015","input":{"description":"background investigation into latency spikes"},"label":"subagent"}
+{"id":"to-s-016","input":{"description":"spike on adopting bun as a runtime"},"label":"subagent"}
+{"id":"to-s-017","input":{"description":"crawl the news site to scrape headlines"},"label":"subagent"}
+{"id":"to-s-018","input":{"description":"fuzz the URL parser to find edge cases"},"label":"subagent"}
+{"id":"to-s-019","input":{"description":"investigate root cause of segfault"},"label":"subagent"}
+{"id":"to-s-020","input":{"description":"research GraphQL federation strategies"},"label":"subagent"}
+{"id":"to-s-021","input":{"description":"explore the git log to find when bug was introduced"},"label":"subagent"}
+{"id":"to-s-022","input":{"description":"sandbox-run benchmark of new compression algorithm"},"label":"subagent"}
+{"id":"to-s-023","input":{"description":"background task: profile cold start times"},"label":"subagent"}
+{"id":"to-s-024","input":{"description":"spike on integrating OpenTelemetry"},"label":"subagent"}
+{"id":"to-s-025","input":{"description":"crawl the wiki for product release dates"},"label":"subagent"}
+{"id":"to-s-026","input":{"description":"fuzz JSON deserializer with adversarial inputs"},"label":"subagent"}
+{"id":"to-s-027","input":{"description":"investigate why CI runtime grew 3x"},"label":"subagent"}
+{"id":"to-s-028","input":{"description":"research vector database options for RAG"},"label":"subagent"}
+{"id":"to-s-029","input":{"description":"explore feasibility of migrating to Rust"},"label":"subagent"}
+{"id":"to-s-030","input":{"description":"background spike on redis cluster topology"},"label":"subagent"}
+{"id":"to-s-031","input":{"description":"investigate flaky e2e selector"},"label":"subagent"}
+{"id":"to-s-032","input":{"description":"crawl github trending for new ML repos"},"label":"subagent"}
+{"id":"to-s-033","input":{"description":"fuzz the markdown renderer for XSS"},"label":"subagent"}
+{"id":"to-s-034","input":{"description":"research how Stripe handles idempotency keys"},"label":"subagent"}
+{"id":"to-s-035","input":{"description":"explore tradeoffs between gRPC and REST"},"label":"subagent"}
+{"id":"to-s-036","input":{"description":"spike on adding e2e tests with playwright"},"label":"subagent"}
+{"id":"to-s-037","input":{"description":"sandbox-run a load test for an hour"},"label":"subagent"}
+{"id":"to-s-038","input":{"description":"investigate why the inference latency is bimodal"},"label":"subagent"}
+{"id":"to-s-039","input":{"description":"research how Vercel implements ISR"},"label":"subagent"}
+{"id":"to-s-040","input":{"description":"crawl forum threads to gather user complaints"},"label":"subagent"}
+{"id":"to-s-041","input":{"description":"fuzz crypto helper with random keys"},"label":"subagent"}
+{"id":"to-s-042","input":{"description":"investigate intermittent 502 errors at the edge"},"label":"subagent"}
+{"id":"to-s-043","input":{"description":"explore caching strategies for our hot path"},"label":"subagent"}
+{"id":"to-s-044","input":{"description":"background research on WASM for plugin host"},"label":"subagent"}
+{"id":"to-s-045","input":{"description":"spike on event sourcing for orders service"},"label":"subagent"}
+{"id":"to-s-046","input":{"description":"crawl a docs site to extract code samples"},"label":"subagent"}
+{"id":"to-s-047","input":{"description":"fuzz the regex engine with pathological inputs"},"label":"subagent"}
+{"id":"to-s-048","input":{"description":"investigate why memory grows unbounded over 24h"},"label":"subagent"}
+{"id":"to-s-049","input":{"description":"research approaches for multi-tenant data isolation"},"label":"subagent"}
+{"id":"to-s-050","input":{"description":"explore migration paths off the legacy ORM"},"label":"subagent"}
+{"id":"to-t-001","input":{"description":"build new feature with researcher + coder-1 + reviewer team"},"label":"team","roles":["researcher","coder-1","reviewer"]}
+{"id":"to-t-002","input":{"description":"parallelize data crawl with 4 workers worker-1 worker-2 worker-3 worker-4"},"label":"team","roles":["worker-1","worker-2","worker-3","worker-4"]}
+{"id":"to-t-003","input":{"description":"draft article with author + editor + fact-checker pipeline"},"label":"team","roles":["editor","fact-checker"]}
+{"id":"to-t-004","input":{"description":"split feature implementation across coder-1 coder-2 and tester team"},"label":"team","roles":["coder-1","coder-2","tester"]}
+{"id":"to-t-005","input":{"description":"explore three implementation branches in parallel branch-a branch-b branch-c team"},"label":"team","roles":["branch-a","branch-b","branch-c"]}
+{"id":"to-t-006","input":{"description":"researcher + designer + coder + reviewer pipeline for new dashboard"},"label":"team","roles":["researcher","designer","coder","reviewer"]}
+{"id":"to-t-007","input":{"description":"team of researcher and coder-1 and reviewer to ship login refactor"},"label":"team","roles":["researcher","coder-1","reviewer"]}
+{"id":"to-t-008","input":{"description":"parallel team: worker-1 worker-2 worker-3 to shard the index build"},"label":"team","roles":["worker-1","worker-2","worker-3"]}
+{"id":"to-t-009","input":{"description":"editor + fact-checker pipeline to publish blog post"},"label":"team","roles":["editor","fact-checker"]}
+{"id":"to-t-010","input":{"description":"coder-1 coder-2 tester team to deliver checkout flow"},"label":"team","roles":["coder-1","coder-2","tester"]}
+{"id":"to-t-011","input":{"description":"researcher + analyst + reviewer team to assess vendor"},"label":"team","roles":["researcher","analyst","reviewer"]}
+{"id":"to-t-012","input":{"description":"team with researcher coder reviewer tester for release readiness"},"label":"team","roles":["researcher","coder","reviewer","tester"]}
+{"id":"to-t-013","input":{"description":"parallelize crawl with worker-1 worker-2 worker-3 worker-4 worker-5"},"label":"team","roles":["worker-1","worker-2","worker-3","worker-4","worker-5"]}
+{"id":"to-t-014","input":{"description":"author with editor and fact-checker for whitepaper team"},"label":"team","roles":["editor","fact-checker"]}
+{"id":"to-t-015","input":{"description":"team of coder-1 and coder-2 building two services in parallel"},"label":"team","roles":["coder-1","coder-2"]}
+{"id":"to-t-016","input":{"description":"researcher + designer + coder-1 team for UI overhaul"},"label":"team","roles":["researcher","designer","coder-1"]}
+{"id":"to-t-017","input":{"description":"analyst + researcher team to produce market study"},"label":"team","roles":["analyst","researcher"]}
+{"id":"to-t-018","input":{"description":"tester + reviewer + coder team to fix flaky suite"},"label":"team","roles":["tester","reviewer","coder"]}
+{"id":"to-t-019","input":{"description":"workers worker-1 worker-2 worker-3 worker-4 to crawl shards"},"label":"team","roles":["worker-1","worker-2","worker-3","worker-4"]}
+{"id":"to-t-020","input":{"description":"team: researcher coder-1 coder-2 reviewer for big migration"},"label":"team","roles":["researcher","coder-1","coder-2","reviewer"]}
+{"id":"to-t-021","input":{"description":"editor + fact-checker + researcher team for investigative article"},"label":"team","roles":["editor","fact-checker","researcher"]}
+{"id":"to-t-022","input":{"description":"branch-a branch-b branch-c team to compare three approaches"},"label":"team","roles":["branch-a","branch-b","branch-c"]}
+{"id":"to-t-023","input":{"description":"coder-1 + coder-2 + coder-3 team for parallel module rewrite"},"label":"team","roles":["coder-1","coder-2","coder-3"]}
+{"id":"to-t-024","input":{"description":"designer + coder + reviewer team for marketing page"},"label":"team","roles":["designer","coder","reviewer"]}
+{"id":"to-t-025","input":{"description":"researcher and tester team to validate hypothesis"},"label":"team","roles":["researcher","tester"]}
+{"id":"to-t-026","input":{"description":"team with worker-1 worker-2 to split scrape workload"},"label":"team","roles":["worker-1","worker-2"]}
+{"id":"to-t-027","input":{"description":"analyst + reviewer team for quarterly report"},"label":"team","roles":["analyst","reviewer"]}
+{"id":"to-t-028","input":{"description":"researcher + coder + reviewer + tester pipeline for new endpoint"},"label":"team","roles":["researcher","coder","reviewer","tester"]}
+{"id":"to-t-029","input":{"description":"editor and fact-checker team to verify claims"},"label":"team","roles":["editor","fact-checker"]}
+{"id":"to-t-030","input":{"description":"team: branch-a branch-b in parallel to A/B different algorithms"},"label":"team","roles":["branch-a","branch-b"]}
+{"id":"to-t-031","input":{"description":"coder-1 coder-2 coder-3 coder-4 team for big-bang refactor"},"label":"team","roles":["coder-1","coder-2","coder-3","coder-4"]}
+{"id":"to-t-032","input":{"description":"researcher + analyst + editor team to draft policy doc"},"label":"team","roles":["researcher","analyst","editor"]}
+{"id":"to-t-033","input":{"description":"team of designer coder-1 coder-2 reviewer to ship redesign"},"label":"team","roles":["designer","coder-1","coder-2","reviewer"]}
+{"id":"to-t-034","input":{"description":"worker-1 worker-2 worker-3 worker-4 worker-5 worker-6 team to chunk data ingest"},"label":"team","roles":["worker-1","worker-2","worker-3","worker-4","worker-5","worker-6"]}
+{"id":"to-t-035","input":{"description":"researcher + coder-1 + tester team for ML data pipeline"},"label":"team","roles":["researcher","coder-1","tester"]}
+{"id":"to-t-036","input":{"description":"team: editor + fact-checker + analyst to QA finance brief"},"label":"team","roles":["editor","fact-checker","analyst"]}
+{"id":"to-t-037","input":{"description":"branch-a branch-b branch-c branch-d team for spike fan-out"},"label":"team","roles":["branch-a","branch-b","branch-c","branch-d"]}
+{"id":"to-t-038","input":{"description":"team coder-1 coder-2 reviewer tester for infra rollout"},"label":"team","roles":["coder-1","coder-2","reviewer","tester"]}
+{"id":"to-t-039","input":{"description":"researcher + designer team for UX exploration"},"label":"team","roles":["researcher","designer"]}
+{"id":"to-t-040","input":{"description":"reviewer + tester team to harden the release pipeline"},"label":"team","roles":["reviewer","tester"]}
+{"id":"to-t-041","input":{"description":"worker-1 worker-2 worker-3 team for parallel image processing"},"label":"team","roles":["worker-1","worker-2","worker-3"]}
+{"id":"to-t-042","input":{"description":"team researcher coder reviewer for security feature"},"label":"team","roles":["researcher","coder","reviewer"]}
+{"id":"to-t-043","input":{"description":"editor + fact-checker pipeline team to ship newsletter"},"label":"team","roles":["editor","fact-checker"]}
+{"id":"to-t-044","input":{"description":"branch-a + branch-b + branch-c team to evaluate three frameworks"},"label":"team","roles":["branch-a","branch-b","branch-c"]}
+{"id":"to-t-045","input":{"description":"coder-1 coder-2 coder-3 reviewer team for monorepo split"},"label":"team","roles":["coder-1","coder-2","coder-3","reviewer"]}
+{"id":"to-t-046","input":{"description":"researcher + analyst + reviewer + editor team for compliance memo"},"label":"team","roles":["researcher","analyst","reviewer","editor"]}
+{"id":"to-t-047","input":{"description":"team of worker-1 worker-2 worker-3 worker-4 to parallelize backfill"},"label":"team","roles":["worker-1","worker-2","worker-3","worker-4"]}
+{"id":"to-t-048","input":{"description":"designer + coder-1 + tester team for mobile checkout"},"label":"team","roles":["designer","coder-1","tester"]}
+{"id":"to-t-049","input":{"description":"researcher + coder-1 + coder-2 + reviewer team to ship API v2"},"label":"team","roles":["researcher","coder-1","coder-2","reviewer"]}
+{"id":"to-t-050","input":{"description":"analyst + researcher + editor + fact-checker team for annual review"},"label":"team","roles":["analyst","researcher","editor","fact-checker"]}

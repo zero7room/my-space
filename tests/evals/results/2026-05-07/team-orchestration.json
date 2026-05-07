@@ -1,29 +1,21 @@
 {
-  "at": "2026-05-07T09:28:48.460Z",
+  "at": "2026-05-07T09:37:02.743Z",
   "result": {
-    "total": 40,
-    "correct": 40,
-    "accuracy": 1,
-    "microF1": 1,
-    "perLabel": {
-      "direct": {
-        "tp": 16,
-        "fp": 0,
-        "fn": 0,
-        "f1": 1
-      },
-      "subagent": {
-        "tp": 12,
-        "fp": 0,
-        "fn": 0,
-        "f1": 1
-      },
-      "team": {
-        "tp": 12,
-        "fp": 0,
-        "fn": 0,
-        "f1": 1
-      }
+    "total": 150,
+    "correct": 142,
+    "accuracy": 0.9466666666666667,
+    "teamRecall": 1,
+    "teamPrecision": 1,
+    "roleMicroF1": 1,
+    "roleCounts": {
+      "tp": 157,
+      "fp": 0,
+      "fn": 0
+    },
+    "teamCounts": {
+      "truth": 50,
+      "predicted": 50,
+      "tp": 50
     }
   }
 }

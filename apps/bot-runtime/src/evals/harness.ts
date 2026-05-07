@@ -87,7 +87,7 @@ export function scoreClassification<T extends EvalRow<unknown, string>>(
 
 const RESULTS_ROOT = path.resolve(process.cwd(), '../../tests/evals/results');
 
-export function persistResult(name: string, result: EvalResult): string {
+export function persistResult(name: string, result: EvalResult | Record<string, unknown>): string {
   const day = new Date().toISOString().slice(0, 10);
   const dir = path.join(RESULTS_ROOT, day);
   mkdirSync(dir, { recursive: true });
