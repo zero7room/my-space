@@ -35,6 +35,7 @@ import {
   ensureDir,
   listSubdirsSorted,
   readJson,
+  sha256File,
 } from '@ai-workflow/fs-store';
 import path from 'node:path';
 
@@ -61,6 +62,8 @@ export interface RecoveryReport {
   jobsRequeued: number;
   teamsFailed: number;
   teamsCancelled: number;
+  teamsReclaimed: number;
+  artifactWarnings: number;
   events: EventEnvelope[];
 }
 
@@ -237,13 +240,67 @@ export class RecoveryScanner {
     // 10. recover team status
     let teamsFailed = 0;
     let teamsCancelled = 0;
+    let teamsReclaimed = 0;
+    let artifactWarnings = 0;
     for (const threadId of threadIds) {
       const tasksRoot = this.paths.threadTasksRoot(threadId);
       const taskIds = await listSubdirsSorted(tasksRoot);
       for (const taskId of taskIds) {
+        // 6. artifact consistency — compare recorded sha256 vs disk sha256
+        const arts = await this.taskRepo.listForThread
+          ? await (async () => {
+              const artifactsDir = this.paths.taskArtifactsRoot(threadId, taskId);
+              const files = await import('@ai-workflow/fs-store').then((m) =>
+                m.listJsonFilesSorted(artifactsDir),
+              );
+              const out: Array<{ id: string; relativePath: string; sha256: string }> = [];
+              for (const f of files) {
+                const rec = await readJson<{ id: string; relativePath: string; sha256: string }>(f);
+                if (rec) out.push(rec);
+              }
+              return out;
+            })()
+          : [];
+        for (const a of arts) {
+          const workspace = this.paths.taskWorkspace(threadId, taskId);
+          const outputs = this.paths.taskOutputs(threadId, taskId);
+          const candidate = a.relativePath.startsWith('outputs/')
+            ? path.join(outputs, a.relativePath.slice('outputs/'.length))
+            : path.join(workspace, a.relativePath);
+          try {
+            const actual = await sha256File(candidate);
+            if (actual !== a.sha256) {
+              artifactWarnings++;
+              append({
+                kind: 'sanitization_applied', // closest event kind; semantic: artifact_consistency_warning
+                threadId,
+                taskId,
+                payload: {
+                  warning: 'artifact_sha256_mismatch',
+                  artifactId: a.id,
+                  recordedSha256: a.sha256,
+                  actualSha256: actual,
+                },
+                at: this.clock.iso(),
+              });
+            }
+          } catch (err) {
+            if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+              artifactWarnings++;
+              append({
+                kind: 'sanitization_applied',
+                threadId,
+                taskId,
+                payload: { warning: 'artifact_missing', artifactId: a.id },
+                at: this.clock.iso(),
+              });
+            }
+          }
+        }
+
         const teams = await this.teamRepo.listTeamsForTask(threadId, taskId);
         for (const team of teams) {
-          const updated = await recoverTeam(team, this.teamRepo, threadId, taskId);
+          const updated = await recoverTeam(team, this.teamRepo, threadId, taskId, this.paths);
           if (updated.status === 'failed') {
             teamsFailed++;
             append({
@@ -264,6 +321,16 @@ export class RecoveryScanner {
               payload: { reason: 'recovery_no_teammates' },
               at: this.clock.iso(),
             });
+          } else if (team.status === 'active' || team.status === 'finishing') {
+            // For active / finishing, reclaim orphaned work-items that have
+            // an expired claim lease by renaming back to available/.
+            teamsReclaimed += await reclaimExpiredWorkItems(
+              this.paths,
+              threadId,
+              taskId,
+              team.id,
+              this.clock,
+            );
           }
         }
       }
@@ -300,6 +367,8 @@ export class RecoveryScanner {
         jobsRequeued,
         teamsFailed,
         teamsCancelled,
+        teamsReclaimed,
+        artifactWarnings,
       },
       at: completedAt,
     });
@@ -323,6 +392,8 @@ export class RecoveryScanner {
       jobsRequeued,
       teamsFailed,
       teamsCancelled,
+      teamsReclaimed,
+      artifactWarnings,
       events,
     };
   }
@@ -333,6 +404,7 @@ async function recoverTeam(
   repo: TeamRepository,
   threadId: string,
   taskId: string,
+  _paths: InstancePaths,
 ): Promise<Team> {
   if (team.status === 'forming') {
     const teammates = await repo.listTeammates(threadId, taskId, team.id);
@@ -348,4 +420,66 @@ async function recoverTeam(
     return next;
   }
   return team;
+}
+
+/**
+ * Scan `work-items/claimed/` for items whose `claimLeaseExpireAt` is past; if
+ * `attemptCount < maxReclaims`, rename the file back into `available/` and
+ * bump `attemptCount`. Past `maxReclaims`, move to `failed/`. Returns the
+ * number of files moved.
+ */
+async function reclaimExpiredWorkItems(
+  paths: InstancePaths,
+  threadId: string,
+  taskId: string,
+  teamId: string,
+  clock: Clock,
+): Promise<number> {
+  const { listJsonFilesSorted, readJson, atomicRename, atomicWriteJson } =
+    await import('@ai-workflow/fs-store');
+  const claimedDir = paths.teamWorkItemRoot(threadId, taskId, teamId, 'claimed');
+  const files = await listJsonFilesSorted(claimedDir);
+  let moved = 0;
+  const now = clock.iso();
+  for (const f of files) {
+    const item = await readJson<{
+      id: string;
+      teamId: string;
+      claimLeaseExpireAt?: string;
+      attemptCount: number;
+      maxReclaims: number;
+    }>(f);
+    if (!item) continue;
+    const expAt = item.claimLeaseExpireAt ? Date.parse(item.claimLeaseExpireAt) : 0;
+    if (!Number.isFinite(expAt) || expAt > Date.now()) continue;
+    const nextAttempt = item.attemptCount + 1;
+    const overflow = nextAttempt >= item.maxReclaims;
+    const bucket = overflow ? 'failed' : 'available';
+    const next = {
+      ...item,
+      status: bucket,
+      claimedByTeammateId: undefined,
+      claimedAt: undefined,
+      claimLeaseExpireAt: undefined,
+      attemptCount: nextAttempt,
+      updatedAt: now,
+    };
+    const targetPath = paths.teamWorkItemFile(
+      threadId,
+      taskId,
+      teamId,
+      bucket,
+      item.id,
+    );
+    // write to target then remove from claimed — prefer the more atomic rename
+    // but the record content changed, so we write + unlink source.
+    await atomicWriteJson(targetPath, next);
+    try {
+      await atomicRename(f, `${f}.reclaimed`);
+    } catch {
+      /* noop */
+    }
+    moved++;
+  }
+  return moved;
 }

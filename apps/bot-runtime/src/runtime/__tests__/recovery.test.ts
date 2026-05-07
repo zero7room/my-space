@@ -217,6 +217,60 @@ describe('RecoveryScanner', () => {
     );
     expect(exists).toBe(true);
   });
+
+  it('flags artifact sha256 mismatch as a warning', async () => {
+    const rt = mkrt();
+    const owner = newUserId();
+    const threadId = newThreadId();
+    const taskId = newTaskId();
+    await rt.threads.create({
+      id: threadId,
+      ownerUserId: owner,
+      title: '',
+      status: 'idle',
+      taskListId: newTaskListId(),
+      channelBindingIds: [],
+      createdAt: NOW,
+      updatedAt: NOW,
+    });
+    await rt.tasks.create({
+      id: taskId,
+      threadId,
+      ownerUserId: owner,
+      title: 't',
+      description: '',
+      status: 'completed',
+      sourceMessageIds: [],
+      artifactIds: [],
+      changeRecordIds: [],
+      archivedRevisionIds: [],
+      schemaVersion: 2,
+      createdAt: NOW,
+      updatedAt: NOW,
+    });
+    // Write an artifact file on disk, record a different sha256.
+    const fsNode = await import('node:fs/promises');
+    await fsNode.mkdir(rt.paths.taskOutputs(threadId, taskId), { recursive: true });
+    const artFilePath = path.join(
+      rt.paths.taskOutputs(threadId, taskId),
+      'a.txt',
+    );
+    await fsNode.writeFile(artFilePath, 'actual content');
+    await rt.artifacts.save(threadId, {
+      id: 'ar_aaaaaaaaaaaaaaaaaaaaa',
+      taskId,
+      planRevisionId: 'pr_aaaaaaaaaaaaaaaaaaaaa',
+      relativePath: 'outputs/a.txt',
+      sizeBytes: 14,
+      mimeType: 'text/plain',
+      sha256: 'b'.repeat(64),
+      status: 'active',
+      createdAt: NOW,
+      updatedAt: NOW,
+    });
+    const r = await new RecoveryScanner({ paths: rt.paths }).run();
+    expect(r.artifactWarnings).toBeGreaterThanOrEqual(1);
+  });
 });
 
 // silence unused imports

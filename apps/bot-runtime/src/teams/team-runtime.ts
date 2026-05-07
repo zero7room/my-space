@@ -160,6 +160,10 @@ export class TeamRuntime {
     // Move team to active.
     const active: Team = { ...team, status: 'active', updatedAt: ts };
     await this.deps.rt.teams.saveTeam(active);
+    // Expand the per-thread SSE buffer while a team is active.
+    if (this.deps.sse) {
+      this.deps.sse.forThread(input.threadId).setActiveTeam(true);
+    }
     await this.emit(input.threadId, input.parentTaskId, teamId, 'team_active');
     return { team: active, teammates };
   }

@@ -4,6 +4,12 @@
  *
  * Frontmatter is YAML between `---` markers. We accept snake_case fields and
  * map to runtime camelCase.
+ *
+ * Fallback cache: after a successful load, the registry persists a snapshot
+ * to `<diagnosticsRoot>/skills-cache.json`. If a later boot fails to load a
+ * skill (yaml parse or schema invalid), the cached version is reused and a
+ * `skills_fallback_to_cache` record is emitted. Purely disk-failed skills
+ * (ENOENT) never fall back — missing on disk means deleted.
  */
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
@@ -13,6 +19,7 @@ import {
   type SkillsLoadError,
   skillManifestSchema,
 } from '@ai-workflow/contracts';
+import { atomicWriteJson, readJson } from '@ai-workflow/fs-store';
 import { parse as parseYaml } from 'yaml';
 
 const FIELD_MAP: Record<string, keyof SkillManifest> = {
@@ -25,19 +32,54 @@ const FIELD_MAP: Record<string, keyof SkillManifest> = {
 export interface LoadResult {
   loaded: SkillManifest[];
   errors: SkillsLoadError[];
+  fellBackTo: string[];
 }
 
 export class SkillRegistry {
   private byName = new Map<string, SkillManifest>();
   private errors: SkillsLoadError[] = [];
+  private fellBackTo: string[] = [];
+
+  constructor(private readonly cachePath?: string) {}
 
   async load(roots: string[]): Promise<LoadResult> {
     this.byName.clear();
     this.errors = [];
+    this.fellBackTo = [];
     for (const root of roots) {
       await this.scanDir(root);
     }
-    return { loaded: [...this.byName.values()], errors: [...this.errors] };
+    // Fallback: for each errored skill, re-populate from cache if present.
+    if (this.cachePath && this.errors.length > 0) {
+      const cached = await readJson<Record<string, SkillManifest>>(this.cachePath);
+      if (cached) {
+        for (const err of this.errors) {
+          // We don't have the skill name on yaml/schema failures — try to read
+          // the file's name field from cache keyed by skillPath folder name.
+          const folderName = path.basename(path.dirname(err.skillPath));
+          const candidate = cached[folderName];
+          if (candidate && !this.byName.has(candidate.name)) {
+            this.byName.set(candidate.name, candidate);
+            this.fellBackTo.push(candidate.name);
+          }
+        }
+      }
+    }
+    // Snapshot successful load for next boot's fallback.
+    if (this.cachePath && this.errors.length === 0 && this.byName.size > 0) {
+      const snapshot: Record<string, SkillManifest> = {};
+      for (const [name, m] of this.byName) snapshot[name] = m;
+      try {
+        await atomicWriteJson(this.cachePath, snapshot);
+      } catch {
+        /* best-effort */
+      }
+    }
+    return {
+      loaded: [...this.byName.values()],
+      errors: [...this.errors],
+      fellBackTo: [...this.fellBackTo],
+    };
   }
 
   lookup(name: string): SkillManifest | undefined {
@@ -49,7 +91,11 @@ export class SkillRegistry {
   }
 
   loadStatus(): LoadResult {
-    return { loaded: this.list(), errors: [...this.errors] };
+    return {
+      loaded: this.list(),
+      errors: [...this.errors],
+      fellBackTo: [...this.fellBackTo],
+    };
   }
 
   private async scanDir(dir: string): Promise<void> {
