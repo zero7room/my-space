@@ -6,37 +6,36 @@
 
 ## Current Phase
 
-Phase 4: Fastify API + Auth + SSE — PENDING
+Phase 5: ThreadLoop + Confirmation + Plan Revision — PENDING
 
 ## Completed Phases
 
 ### Phase 0: Repository Scaffold — 2026-05-06
 
-- `pnpm install` → ok (252 pkgs)
-- `pnpm -r build` / `test` / `lint` → ok
+ok.
 
 ### Phase 1: Contracts, IDs, Schemas, State Machines — 2026-05-07
 
-Verification: contracts 45 pass, all green.
+contracts: 45 tests pass.
 
 ### Phase 2: Filesystem Store + Transactions — 2026-05-07
 
-Verification: fs-store 27 pass, all green.
+fs-store: 27 tests pass.
 
 ### Phase 3: Runtime Repositories + Recovery — 2026-05-07
 
-Verification:
-- `pnpm --filter @ai-workflow/bot-runtime build` → ok
-- `pnpm --filter @ai-workflow/bot-runtime test` → 14 passed (2 files)
-- `pnpm -r build` / `test` (86 total) / `lint` → green
+bot-runtime: 14 tests (repositories + recovery).
+
+### Phase 4: Fastify API + Auth + SSE — 2026-05-07
+
+bot-runtime: +11 tests (server + SSE bus). Total bot-runtime: 25.
+- `pnpm -r build` / `test` / `lint` → green. Total tests: 97.
 
 Modules:
-- `apps/bot-runtime/src/runtime/repositories/` — User, Thread (transcript+drafts+guard log), Task+TaskList, Plan+PlanRevision, Artifact+ChangeRecord, ChannelConfig+Binding+Event+Job (chat-claims via O_EXCL), CriticalNodePolicy, Team (work-items/messages/teammates), RuntimeInfo.
-- `apps/bot-runtime/src/runtime/paths.ts` — `RuntimePaths` composes InstancePaths + all repos.
-- `apps/bot-runtime/src/runtime/migrations/task-retry-state.ts` — v1→v2 task migration with default `TaskRetryState`.
-- `apps/bot-runtime/src/runtime/recovery.ts` — startup recovery scan: tmp cleanup, transactions, schemaVersion migration, stale running→blocked, TaskList repair, locked→pending job requeue, retry-scheduler stale lock rename, team status reconciliation, diagnostics jsonl.
-
-Deferred: instance lock acquisition is in fs-store (`acquireInstanceLock`); Phase 4 wires it into the API server boot.
+- `apps/bot-runtime/src/auth/user-token.ts` — `LOCAL_USER_TOKENS` parser, redacted token hint, `TokenAuthService`.
+- `apps/bot-runtime/src/runtime/sse/bus.ts` — `ThreadEventBus` ring buffer with replay, age + cap eviction, team-active uplift; `SseRegistry` per-thread.
+- `apps/bot-runtime/src/api/server.ts` — Fastify boot: instance lock → recovery scan → routes; `Authorization: Bearer` preHandler with redact log + owner-first helper.
+- `apps/bot-runtime/src/api/routes/{users,threads,tasks,artifacts,channels,policies,skills,teams,health}.ts` — full route surface from Phase 1 contract; cross-phase actions write to `control.json` pendingSignals (Phase 5 will consume).
 
 ## Phase Index
 
@@ -44,7 +43,7 @@ Deferred: instance lock acquisition is in fs-store (`acquireInstanceLock`); Phas
 - [x] Phase 1: Contracts, IDs, Schemas, State Machines
 - [x] Phase 2: Filesystem Store, Transactions
 - [x] Phase 3: Runtime Repositories, Recovery Scan
-- [ ] Phase 4: Fastify API, Auth, SSE
+- [x] Phase 4: Fastify API, Auth, SSE
 - [ ] Phase 5: ThreadLoop, MessageGuard, Task Confirmation, Plan Revision
 - [ ] Phase 6: Executor, Runtime Loop, Tools, Skills, CriticalNodePolicy
 - [ ] Phase 7: Retry, Blocked Actions, Notify Throttling, Recovery Hardening

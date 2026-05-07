@@ -1,13 +1,35 @@
-// bot-runtime entry point. Phase 0 wires up only a no-op startup; real
-// API/SSE/runtime modules land in later phases.
+import 'dotenv/config';
+
+import { createServer } from './api/server.js';
+
 async function main(): Promise<void> {
-  console.log('bot-runtime: Phase 0 scaffold ok');
+  const port = Number.parseInt(process.env['PORT'] ?? '4000', 10);
+  const host = process.env['HOST'] ?? '0.0.0.0';
+  const runtimeId = process.env['RUNTIME_ID'] ?? 'default';
+  const workspaceRoot = process.env['WORKSPACE_ROOT'] ?? process.cwd();
+  const localUserTokens = process.env['LOCAL_USER_TOKENS'];
+
+  const handle = await createServer({
+    workspaceRoot,
+    runtimeId,
+    port,
+    host,
+    localUserTokens,
+  });
+
+  await handle.app.listen({ port, host });
+  console.log(`bot-runtime listening on ${host}:${port} (runtimeId=${runtimeId})`);
+
+  for (const sig of ['SIGINT', 'SIGTERM'] as const) {
+    process.once(sig, async () => {
+      console.log(`\nbot-runtime: ${sig} received, shutting down`);
+      await handle.close();
+      process.exit(0);
+    });
+  }
 }
 
-main().then(
-  () => process.exit(0),
-  (err) => {
-    console.error(err);
-    process.exit(1);
-  },
-);
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});
