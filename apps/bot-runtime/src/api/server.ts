@@ -173,7 +173,7 @@ export async function createServer(cfg: ServerConfig): Promise<ServerHandle> {
   registerSkillRoutes(app, { rt, registry: skillRegistry });
   registerTeamRoutes(app, { rt, sse, taskIndex });
 
-  const ackSweeper = new AckSweeper({ sse, intervalMs: 10_000 });
+  const ackSweeper = new AckSweeper({ sse, intervalMs: 10_000, metrics });
   const dedupeReaper = new DedupeReaper({
     rt,
     intervalMs: 60 * 60 * 1000,

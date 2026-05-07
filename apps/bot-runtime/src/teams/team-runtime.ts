@@ -32,10 +32,12 @@ import {
   newWorkItemId,
   newMessageId,
   newActorId,
+  sanitizeWithReport,
 } from '@ai-workflow/contracts';
 
 import type { RuntimePaths } from '../runtime/paths.js';
 import type { SseRegistry } from '../runtime/sse/index.js';
+import type { RuntimeMetrics } from '../metrics/metrics.js';
 
 const HARD_TEAM_BUDGET_MAX = {
   maxTeammates: 8,
@@ -73,6 +75,7 @@ export interface CreateTeamInput {
 export interface TeamRuntimeDeps {
   rt: RuntimePaths;
   sse?: SseRegistry;
+  metrics?: RuntimeMetrics;
   /** ActorId factory: lets tests fix actors. */
   newActor?: () => string;
   now?: () => string;
@@ -155,6 +158,9 @@ export class TeamRuntime {
       };
       await this.deps.rt.teams.saveTeammate(input.threadId, input.parentTaskId, tm);
       teammates.push(tm);
+      try {
+        this.deps.metrics?.teammateSpawned.inc({ persona: slot.persona ?? 'unknown' });
+      } catch { /* best-effort */ }
       await this.emit(input.threadId, input.parentTaskId, teamId, 'teammate_spawned', { teammateId: tm.id });
     }
     // Move team to active.
@@ -164,7 +170,12 @@ export class TeamRuntime {
     if (this.deps.sse) {
       this.deps.sse.forThread(input.threadId).setActiveTeam(true);
     }
+    try {
+      this.deps.metrics?.teamStarted.inc();
+      this.deps.metrics?.teamActiveCount.inc();
+    } catch { /* best-effort */ }
     await this.emit(input.threadId, input.parentTaskId, teamId, 'team_active');
+    await this.emit(input.threadId, input.parentTaskId, teamId, 'team_started');
     return { team: active, teammates };
   }
 
@@ -176,10 +187,12 @@ export class TeamRuntime {
     opts?: { preferredRole?: string; priority?: number },
   ): Promise<TeamWorkItem> {
     const ts = this.now;
+    // Acceptance 65: PII-sanitize WorkItem.description before persisting.
+    const san = sanitizeWithReport(description ?? '');
     const item: TeamWorkItem = {
       id: newWorkItemId(),
       teamId,
-      description,
+      description: san.output,
       preferredRole: opts?.preferredRole,
       priority: opts?.priority ?? 0,
       status: 'available',
@@ -189,7 +202,19 @@ export class TeamRuntime {
       updatedAt: ts,
     };
     await this.deps.rt.teams.saveWorkItem(threadId, taskId, 'available', item);
+    try {
+      this.deps.metrics?.workItemPublished.inc({ preferredRole: opts?.preferredRole ?? 'any' });
+      this.deps.metrics?.workItemsTotal.inc({ bucket: 'available' });
+    } catch { /* best-effort */ }
+    if (san.redactedKinds.length > 0) {
+      await this.emit(threadId, taskId, teamId, 'lastFailureReason_redacted', {
+        streamKind: 'team-events',
+        site: 'work_item.description',
+        redactedKinds: san.redactedKinds,
+      });
+    }
     await this.emit(threadId, taskId, teamId, 'team_work_item_created', { workItemId: item.id });
+    await this.emit(threadId, taskId, teamId, 'work_item_published', { workItemId: item.id });
     return item;
   }
 
@@ -204,6 +229,17 @@ export class TeamRuntime {
     const items = await this.deps.rt.teams.listWorkItems(threadId, taskId, teamId, 'available');
     const cur = items.find((i) => i.id === workItemId);
     if (!cur) throw new Error('work item not available');
+    // Acceptance 58: rename FIRST (atomic acquire under EEXIST/ENOENT semantics),
+    // THEN overwrite the moved file with the claimed content. This prevents the
+    // previous publish-then-rename race where the rename clobbered just-written
+    // claimed content with stale 'available' bytes.
+    try {
+      await this.deps.rt.teams.moveWorkItem(threadId, taskId, teamId, workItemId, 'available', 'claimed');
+    } catch (err) {
+      // Lost the race — another teammate already moved the file.
+      try { this.deps.metrics?.teamClaimContention.inc(); } catch { /* best-effort */ }
+      throw new Error(`claim contention: ${(err as Error).message}`);
+    }
     const claimed: TeamWorkItem = {
       ...cur,
       status: 'claimed',
@@ -214,8 +250,12 @@ export class TeamRuntime {
       updatedAt: ts,
     };
     await this.deps.rt.teams.saveWorkItem(threadId, taskId, 'claimed', claimed);
-    await this.deps.rt.teams.moveWorkItem(threadId, taskId, teamId, workItemId, 'available', 'claimed').catch(() => undefined);
+    try {
+      this.deps.metrics?.workItemClaimed.inc();
+      this.deps.metrics?.workItemsTotal.inc({ bucket: 'claimed' });
+    } catch { /* best-effort */ }
     await this.emit(threadId, taskId, teamId, 'team_work_item_claimed', { workItemId, teammateId });
+    await this.emit(threadId, taskId, teamId, 'work_item_claimed', { workItemId, teammateId });
     return claimed;
   }
 
@@ -230,15 +270,35 @@ export class TeamRuntime {
     const items = await this.deps.rt.teams.listWorkItems(threadId, taskId, teamId, 'claimed');
     const cur = items.find((i) => i.id === workItemId);
     if (!cur) throw new Error('work item not claimed');
+    // Acceptance 65: sanitize resultRef text before persisting.
+    let sanitizedResultRef = resultRef;
+    let resultRefRedacted: string[] = [];
+    if (typeof resultRef === 'string' && resultRef.length > 0) {
+      const san = sanitizeWithReport(resultRef);
+      sanitizedResultRef = san.output;
+      resultRefRedacted = san.redactedKinds;
+    }
     const completed: TeamWorkItem = {
       ...cur,
       status: 'completed',
-      resultRef,
+      resultRef: sanitizedResultRef,
       updatedAt: ts,
     };
     await this.deps.rt.teams.saveWorkItem(threadId, taskId, 'completed', completed);
     await this.deps.rt.teams.moveWorkItem(threadId, taskId, teamId, workItemId, 'claimed', 'completed').catch(() => undefined);
+    if (resultRefRedacted.length > 0) {
+      await this.emit(threadId, taskId, teamId, 'lastFailureReason_redacted', {
+        streamKind: 'team-events',
+        site: 'work_item.resultRef',
+        redactedKinds: resultRefRedacted,
+      });
+    }
     await this.emit(threadId, taskId, teamId, 'team_work_item_completed', { workItemId });
+    await this.emit(threadId, taskId, teamId, 'work_item_completed', { workItemId });
+    try {
+      this.deps.metrics?.workItemCompleted.inc();
+      this.deps.metrics?.workItemsTotal.inc({ bucket: 'completed' });
+    } catch { /* best-effort */ }
     return completed;
   }
 
@@ -248,14 +308,34 @@ export class TeamRuntime {
     teamId: string,
     msg: Omit<TeamMessage, 'id' | 'at' | 'teamId'>,
   ): Promise<TeamMessage> {
+    // Acceptance 65: sanitize TeamMessage.content before persisting.
+    let sanitizedContent = msg.content;
+    let redactedKinds: string[] = [];
+    if (typeof msg.content === 'string' && msg.content.length > 0) {
+      const san = sanitizeWithReport(msg.content);
+      sanitizedContent = san.output;
+      redactedKinds = san.redactedKinds;
+    }
     const built: TeamMessage = {
       id: newMessageId(),
       teamId,
       at: this.now,
       ...msg,
+      content: sanitizedContent,
     };
     await this.deps.rt.teams.appendTeamMessage(threadId, taskId, built);
+    if (redactedKinds.length > 0) {
+      await this.emit(threadId, taskId, teamId, 'lastFailureReason_redacted', {
+        streamKind: 'messages',
+        site: 'team_message.content',
+        redactedKinds,
+      });
+    }
     await this.emit(threadId, taskId, teamId, 'team_message_appended', { messageId: built.id });
+    await this.emit(threadId, taskId, teamId, 'team_message_posted', { messageId: built.id, kind: msg.kind });
+    try {
+      this.deps.metrics?.teamMessagePosted.inc({ kind: msg.kind });
+    } catch { /* best-effort */ }
     return built;
   }
 
@@ -285,6 +365,10 @@ export class TeamRuntime {
     await this.emit(threadId, taskId, teamId, 'team_finishing');
     const done: Team = { ...finishing, status: 'completed', summary, updatedAt: this.now };
     await this.deps.rt.teams.saveTeam(done);
+    try {
+      this.deps.metrics?.teamCompleted.inc({ outcome: summary.outcome });
+      this.deps.metrics?.teamActiveCount.dec();
+    } catch { /* best-effort */ }
     await this.emit(threadId, taskId, teamId, 'team_completed', { outcome: summary.outcome });
     return done;
   }

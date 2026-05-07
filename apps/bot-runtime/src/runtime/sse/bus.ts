@@ -66,7 +66,58 @@ export class ThreadEventBus {
     this.buffer.push(entry);
     this.evictByCap();
     this.evictByAge();
+    this.checkCausalInvariant(event);
     for (const s of this.subs) s.push(entry);
+  }
+
+  /**
+   * Acceptance 69 / 54 — detect SSE replay invariant violations:
+   *   - work_item_claimed must follow work_item_published for that workItemId
+   *   - team_completed must follow all teammate terminal events for the team
+   * On violation we record `lastInvariantViolation`, which the ack-sweeper
+   * surfaces as an `sse_replay_invariant_violated` envelope and a counter inc.
+   */
+  private readonly publishedWorkItems = new Set<string>();
+  private readonly teammateTerminalsByTeam = new Map<string, number>();
+  private lastInvariantViolation:
+    | { invariant: string; eventId: string; details: Record<string, unknown> }
+    | undefined;
+
+  private checkCausalInvariant(ev: EventEnvelope): void {
+    const p = (ev.payload as Record<string, unknown> | undefined) ?? {};
+    if (ev.kind === 'work_item_published' || ev.kind === 'team_work_item_created') {
+      const id = (p['workItemId'] as string | undefined);
+      if (id) this.publishedWorkItems.add(id);
+    } else if (ev.kind === 'work_item_claimed' || ev.kind === 'team_work_item_claimed') {
+      const id = (p['workItemId'] as string | undefined);
+      if (id && !this.publishedWorkItems.has(id)) {
+        this.lastInvariantViolation = {
+          invariant: 'work_item_claimed_after_published',
+          eventId: ev.id,
+          details: { workItemId: id },
+        };
+      }
+    } else if (ev.kind === 'teammate_finished' || ev.kind === 'teammate_failed' || ev.kind === 'teammate_cancelled') {
+      const teamId = ev.teamId;
+      if (teamId) this.teammateTerminalsByTeam.set(teamId, (this.teammateTerminalsByTeam.get(teamId) ?? 0) + 1);
+    } else if (ev.kind === 'team_completed') {
+      const teamId = ev.teamId;
+      if (teamId && (this.teammateTerminalsByTeam.get(teamId) ?? 0) === 0) {
+        this.lastInvariantViolation = {
+          invariant: 'team_completed_after_teammate_terminals',
+          eventId: ev.id,
+          details: { teamId },
+        };
+      }
+    }
+  }
+
+  drainInvariantViolation():
+    | { invariant: string; eventId: string; details: Record<string, unknown> }
+    | undefined {
+    const v = this.lastInvariantViolation;
+    this.lastInvariantViolation = undefined;
+    return v;
   }
 
   /**

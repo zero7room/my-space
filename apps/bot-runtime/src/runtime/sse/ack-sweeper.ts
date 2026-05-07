@@ -6,10 +6,12 @@
 import { newEventId } from '@ai-workflow/contracts';
 
 import type { SseRegistry } from './bus.js';
+import type { RuntimeMetrics } from '../../metrics/metrics.js';
 
 export interface AckSweeperOptions {
   sse: SseRegistry;
   intervalMs?: number;
+  metrics?: RuntimeMetrics;
   now?: () => string;
 }
 
@@ -37,6 +39,25 @@ export class AckSweeper {
           },
           at: now,
         });
+        try { this.opts.metrics?.sseReplayTruncated.inc({ reason: trunc.reason }); } catch { /* best-effort */ }
+        emitted++;
+      }
+      // Acceptance 69 / 54 — surface invariant violations as their own envelope.
+      const inv = bus.drainInvariantViolation();
+      if (inv) {
+        bus.publish({
+          id: newEventId(),
+          seq: (bus.bufferTail()?.seq ?? 0) + 1,
+          kind: 'sse_replay_invariant_violated',
+          threadId,
+          payload: {
+            invariant: inv.invariant,
+            eventId: inv.eventId,
+            ...inv.details,
+          },
+          at: now,
+        });
+        try { this.opts.metrics?.sseReplayInvariantViolated.inc({ invariant: inv.invariant }); } catch { /* best-effort */ }
         emitted++;
       }
       for (const miss of bus.checkAckTimeouts()) {
@@ -64,6 +85,10 @@ export class AckSweeper {
           },
           at: now,
         });
+        try {
+          this.opts.metrics?.sseAckMissing.inc({ threadId });
+          this.opts.metrics?.sseReplayEmitted.inc({ reason: 'ack_missing' });
+        } catch { /* best-effort */ }
         emitted += 2;
       }
     }

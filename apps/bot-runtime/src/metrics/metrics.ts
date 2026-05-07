@@ -17,14 +17,34 @@ export class RuntimeMetrics {
   readonly sanitizationsTotal: Counter<string>;
   readonly teamStarted: Counter<string>;
   readonly teamCompleted: Counter<string>;
+  readonly teamFormingFailed: Counter<string>;
+  readonly teamActiveCount: Gauge<string>;
+  readonly teammateSpawned: Counter<string>;
+  readonly teammateFailed: Counter<string>;
   readonly teammateActiveCount: Gauge<string>;
+  readonly workItemPublished: Counter<string>;
+  readonly workItemClaimed: Counter<string>;
+  readonly workItemCompleted: Counter<string>;
+  readonly workItemFailed: Counter<string>;
+  readonly workItemReclaimExhausted: Counter<string>;
   readonly workItemsTotal: Counter<string>;
   readonly workItemsAvailable: Gauge<string>;
+  readonly teamMessagePosted: Counter<string>;
+  readonly teamMessageBudgetExhausted: Counter<string>;
+  readonly teamBudgetExhausted: Counter<string>;
+  readonly teamClaimContention: Counter<string>;
+  readonly teamRecoveryFailed: Counter<string>;
+  readonly teammateRecoveryFailed: Counter<string>;
   readonly sseAckMissing: Counter<string>;
   readonly sseReplayEmitted: Counter<string>;
+  readonly sseReplayTruncated: Counter<string>;
+  readonly sseReplayInvariantViolated: Counter<string>;
   readonly artifactConsistencyWarning: Counter<string>;
   readonly notifyThrottled: Counter<string>;
   readonly eventsJsonlRotated: Counter<string>;
+  readonly eventsJsonlRotationFailed: Counter<string>;
+  readonly eventsJsonlActiveSizeBytes: Gauge<string>;
+  readonly taskRetryClassificationWarning: Counter<string>;
   readonly skillsLoadErrorTotal: Counter<string>;
   readonly skillsFallbackToCacheTotal: Counter<string>;
 
@@ -87,10 +107,60 @@ export class RuntimeMetrics {
       labelNames: ['outcome'],
       registers: [this.registry],
     });
+    this.teamFormingFailed = new Counter({
+      name: 'ai_team_forming_failed_total',
+      help: 'Teams that failed during forming',
+      labelNames: ['reason'],
+      registers: [this.registry],
+    });
+    this.teamActiveCount = new Gauge({
+      name: 'ai_team_active_count',
+      help: 'Active teams right now',
+      registers: [this.registry],
+    });
+    this.teammateSpawned = new Counter({
+      name: 'ai_teammate_spawned_total',
+      help: 'Teammates spawned',
+      labelNames: ['persona'],
+      registers: [this.registry],
+    });
+    this.teammateFailed = new Counter({
+      name: 'ai_teammate_failed_total',
+      help: 'Teammates that transitioned to failed',
+      labelNames: ['failureClass'],
+      registers: [this.registry],
+    });
     this.teammateActiveCount = new Gauge({
       name: 'ai_teammate_active_count',
       help: 'Teammates currently idle or working',
       labelNames: ['team_status'],
+      registers: [this.registry],
+    });
+    this.workItemPublished = new Counter({
+      name: 'ai_work_item_published_total',
+      help: 'Work items published',
+      labelNames: ['preferredRole'],
+      registers: [this.registry],
+    });
+    this.workItemClaimed = new Counter({
+      name: 'ai_work_item_claimed_total',
+      help: 'Work items claimed',
+      registers: [this.registry],
+    });
+    this.workItemCompleted = new Counter({
+      name: 'ai_work_item_completed_total',
+      help: 'Work items completed',
+      registers: [this.registry],
+    });
+    this.workItemFailed = new Counter({
+      name: 'ai_work_item_failed_total',
+      help: 'Work items failed',
+      labelNames: ['failureClass'],
+      registers: [this.registry],
+    });
+    this.workItemReclaimExhausted = new Counter({
+      name: 'ai_work_item_reclaim_exhausted_total',
+      help: 'Work items whose reclaim attempts ran out',
       registers: [this.registry],
     });
     this.workItemsTotal = new Counter({
@@ -104,15 +174,62 @@ export class RuntimeMetrics {
       help: 'Work items in available/ right now',
       registers: [this.registry],
     });
+    this.teamMessagePosted = new Counter({
+      name: 'ai_team_message_posted_total',
+      help: 'Team messages posted',
+      labelNames: ['kind'],
+      registers: [this.registry],
+    });
+    this.teamMessageBudgetExhausted = new Counter({
+      name: 'ai_team_message_budget_exhausted_total',
+      help: 'Team message budget exhausted',
+      registers: [this.registry],
+    });
+    this.teamBudgetExhausted = new Counter({
+      name: 'ai_team_budget_exhausted_total',
+      help: 'Team budget exhausted by dimension',
+      labelNames: ['dim'],
+      registers: [this.registry],
+    });
+    this.teamClaimContention = new Counter({
+      name: 'ai_team_claim_contention_total',
+      help: 'Concurrent claim contention losses',
+      registers: [this.registry],
+    });
+    this.teamRecoveryFailed = new Counter({
+      name: 'ai_team_recovery_failed_total',
+      help: 'Team recovery failures',
+      labelNames: ['reason'],
+      registers: [this.registry],
+    });
+    this.teammateRecoveryFailed = new Counter({
+      name: 'ai_teammate_recovery_failed_total',
+      help: 'Teammate recovery failures',
+      labelNames: ['reason'],
+      registers: [this.registry],
+    });
     this.sseAckMissing = new Counter({
       name: 'ai_sse_ack_missing_total',
       help: 'SSE subscribers that exceeded the ack timeout',
+      labelNames: ['threadId'],
       registers: [this.registry],
     });
     this.sseReplayEmitted = new Counter({
       name: 'ai_sse_replay_emitted_total',
       help: 'SSE replay envelopes synthesized',
       labelNames: ['reason'],
+      registers: [this.registry],
+    });
+    this.sseReplayTruncated = new Counter({
+      name: 'ai_sse_replay_truncated_total',
+      help: 'SSE replay truncated envelopes synthesized',
+      labelNames: ['reason'],
+      registers: [this.registry],
+    });
+    this.sseReplayInvariantViolated = new Counter({
+      name: 'ai_sse_replay_invariant_violated_total',
+      help: 'SSE replay observed an invariant violation',
+      labelNames: ['invariant'],
       registers: [this.registry],
     });
     this.artifactConsistencyWarning = new Counter({
@@ -130,6 +247,24 @@ export class RuntimeMetrics {
     this.eventsJsonlRotated = new Counter({
       name: 'ai_events_jsonl_rotated_total',
       help: 'events.jsonl files rotated at size/age threshold',
+      labelNames: ['reason'],
+      registers: [this.registry],
+    });
+    this.eventsJsonlRotationFailed = new Counter({
+      name: 'ai_events_jsonl_rotation_failed_total',
+      help: 'events.jsonl rotation failures',
+      labelNames: ['errorClass'],
+      registers: [this.registry],
+    });
+    this.eventsJsonlActiveSizeBytes = new Gauge({
+      name: 'ai_events_jsonl_active_size_bytes',
+      help: 'Active events.jsonl size (bytes) per task',
+      labelNames: ['taskId'],
+      registers: [this.registry],
+    });
+    this.taskRetryClassificationWarning = new Counter({
+      name: 'ai_task_retry_classification_warning_total',
+      help: 'Retry classification warning events emitted',
       registers: [this.registry],
     });
     this.skillsLoadErrorTotal = new Counter({
