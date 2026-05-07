@@ -1,6 +1,10 @@
 'use client';
 import * as React from 'react';
 import { api } from '../lib/api-client';
+import {
+  blockedReasonDescription,
+  blockedReasonTitle,
+} from '../lib/blocked-reason-copy';
 import { useTasksStore } from '../lib/stores/tasks';
 import { showError, showSuccess } from './workbench/ToastProvider';
 import { cn } from '../lib/cn';
@@ -75,7 +79,8 @@ export function TaskActions({ taskId, status, blockedReason }: Props): React.JSX
   const danger = `${base} border border-danger/40 bg-surface text-danger hover:bg-danger/10`;
 
   return (
-    <div className="mt-3 flex flex-wrap items-center gap-2">
+    <div className="mt-3 flex flex-col gap-2">
+      <div className="flex flex-wrap items-center gap-2">
       {canConfirm && (
         <button type="button" disabled={busy !== null} className={primary}
           onClick={() => run('confirm', () => api.confirmTask(taskId))}>
@@ -114,13 +119,21 @@ export function TaskActions({ taskId, status, blockedReason }: Props): React.JSX
       )}
       {blocked && blocked.blockedReason ? (
         <span className={cn('u-label', 'ml-2')}>
-          阻塞原因：<span className="not-italic text-danger/90">{blocked.blockedReason}</span>
+          阻塞原因：<span className="not-italic text-danger/90">{blockedReasonTitle(blocked.blockedReason)}</span>
         </span>
       ) : blockedReason ? (
         <span className="u-label ml-2">
-          阻塞原因：<span className="text-danger/90">{blockedReason}</span>
+          阻塞原因：<span className="text-danger/90">{blockedReasonTitle(blockedReason)}</span>
         </span>
       ) : null}
+      </div>
+      {(() => {
+        const reason = blocked?.blockedReason ?? blockedReason;
+        const desc = blockedReasonDescription(reason);
+        return desc ? (
+          <p className="text-xs text-muted">{desc}</p>
+        ) : null;
+      })()}
     </div>
   );
 }

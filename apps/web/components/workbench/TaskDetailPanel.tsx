@@ -2,6 +2,10 @@
 import * as React from 'react';
 import type { TaskActionResponse } from '@ai-workflow/contracts';
 import { api } from '../../lib/api-client';
+import {
+  blockedReasonDescription,
+  blockedReasonTitle,
+} from '../../lib/blocked-reason-copy';
 import { cn } from '../../lib/cn';
 import { useTasksStore } from '../../lib/stores/tasks';
 import { TaskActions } from '../TaskActions';
@@ -258,7 +262,12 @@ function SummarySection(props: {
       {task.blockedReason ? (
         <section className="rounded-card border border-danger/40 bg-danger/10 p-3 text-sm text-danger">
           <div className="u-label mb-1 text-danger">阻塞原因</div>
-          <p>{task.blockedReason}</p>
+          <p className="font-medium">{blockedReasonTitle(task.blockedReason)}</p>
+          {blockedReasonDescription(task.blockedReason) ? (
+            <p className="mt-1 text-xs text-danger/80">
+              {blockedReasonDescription(task.blockedReason)}
+            </p>
+          ) : null}
         </section>
       ) : null}
 

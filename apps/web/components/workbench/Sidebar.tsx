@@ -3,6 +3,7 @@ import * as React from 'react';
 import { api } from '../../lib/api-client';
 import { cn } from '../../lib/cn';
 import { useConversationsStore } from '../../lib/stores/conversations';
+import { showError } from './ToastProvider';
 
 function relativeTime(iso: string): string {
   const ts = new Date(iso).getTime();
@@ -30,6 +31,16 @@ export function Sidebar(props: {
   const setLoading = useConversationsStore((s) => s.setLoading);
   const sidebarCollapsed = useConversationsStore((s) => s.sidebarCollapsed);
   const setSidebarCollapsed = useConversationsStore((s) => s.setSidebarCollapsed);
+  const [composerOpen, setComposerOpen] = React.useState(false);
+  const [composerTitle, setComposerTitle] = React.useState('');
+  const [composerBusy, setComposerBusy] = React.useState(false);
+  const composerInputRef = React.useRef<HTMLInputElement | null>(null);
+
+  React.useEffect(() => {
+    if (composerOpen) {
+      composerInputRef.current?.focus();
+    }
+  }, [composerOpen]);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -51,22 +62,35 @@ export function Sidebar(props: {
     };
   }, [setThreads, setLoading]);
 
-  const handleCreate = React.useCallback(async () => {
-    const title =
-      typeof window !== 'undefined'
-        ? window.prompt('新对话标题', '未命名对话')
-        : undefined;
-    if (title === null) return; // user cancelled
+  const handleCreate = React.useCallback(() => {
+    // Open the inline composer. Actual submission happens in submitCreate().
+    setComposerTitle('');
+    setComposerOpen(true);
+    if (sidebarCollapsed) setSidebarCollapsed(false);
+  }, [sidebarCollapsed, setSidebarCollapsed]);
+
+  const submitCreate = React.useCallback(async () => {
+    const trimmed = composerTitle.trim();
+    setComposerBusy(true);
     try {
       const res = await api.createThread(
-        title && title.trim().length > 0 ? { title: title.trim() } : {},
+        trimmed.length > 0 ? { title: trimmed } : {},
       );
       upsertThread(res.thread);
       setActive(res.thread.id);
-    } catch {
-      /* swallow — a toast system can be added later */
+      setComposerOpen(false);
+      setComposerTitle('');
+    } catch (err) {
+      showError(err);
+    } finally {
+      setComposerBusy(false);
     }
-  }, [upsertThread, setActive]);
+  }, [composerTitle, upsertThread, setActive]);
+
+  const cancelCreate = React.useCallback(() => {
+    setComposerOpen(false);
+    setComposerTitle('');
+  }, []);
 
   const handleSelect = React.useCallback(
     (id: string) => {
@@ -167,6 +191,47 @@ export function Sidebar(props: {
         >
           + 新对话
         </button>
+        {composerOpen ? (
+          <div className="mt-2 rounded-card border border-border bg-surface-raised p-2 shadow-soft">
+            <input
+              ref={composerInputRef}
+              type="text"
+              value={composerTitle}
+              onChange={(e) => setComposerTitle(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  if (!composerBusy) void submitCreate();
+                } else if (e.key === 'Escape') {
+                  e.preventDefault();
+                  cancelCreate();
+                }
+              }}
+              placeholder="对话标题（可空）"
+              disabled={composerBusy}
+              aria-label="新对话标题"
+              className="w-full rounded-pill border border-border bg-surface px-3 py-1.5 text-sm text-foreground placeholder:text-muted focus:border-accent focus:outline-none disabled:opacity-60"
+            />
+            <div className="mt-2 flex items-center justify-end gap-2 text-xs">
+              <button
+                type="button"
+                onClick={cancelCreate}
+                disabled={composerBusy}
+                className="rounded-pill px-3 py-1 text-muted hover:text-foreground disabled:opacity-50"
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                onClick={() => void submitCreate()}
+                disabled={composerBusy}
+                className="rounded-pill bg-accent px-3 py-1 text-white shadow-soft hover:-translate-y-px disabled:opacity-50"
+              >
+                {composerBusy ? '创建中…' : '创建'}
+              </button>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       <ul className="flex-1 space-y-1 overflow-y-auto px-3 pb-4">
