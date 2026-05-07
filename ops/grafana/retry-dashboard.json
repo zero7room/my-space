@@ -1,0 +1,501 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "Retry & recovery telemetry for the AI workflow runtime. Maps 1:1 to the §19 metric list. See docs/runbooks/retry-troubleshooting.md.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [
+    {
+      "title": "Retry Troubleshooting Runbook",
+      "url": "https://github.com/ai-workflow/my-space/blob/main/docs/runbooks/retry-troubleshooting.md",
+      "type": "link",
+      "icon": "doc",
+      "targetBlank": true
+    }
+  ],
+  "liveNow": false,
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["retry", "ai-workflow", "oncall"],
+  "templating": {
+    "list": [
+      {
+        "current": { "selected": false, "text": "Prometheus", "value": "prometheus" },
+        "hide": 0,
+        "includeAll": false,
+        "label": "Datasource",
+        "multi": false,
+        "name": "DS_PROMETHEUS",
+        "options": [],
+        "query": "prometheus",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "type": "datasource"
+      },
+      {
+        "current": { "selected": false, "text": "All", "value": "$__all" },
+        "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+        "definition": "label_values(task_retry_scheduled_total, instance)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "instance",
+        "multi": true,
+        "name": "instance",
+        "options": [],
+        "query": { "query": "label_values(task_retry_scheduled_total, instance)", "refId": "StandardVariableQuery" },
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "",
+  "title": "Retry & Recovery",
+  "uid": "retry-recovery-v1",
+  "version": 1,
+  "weekStart": "",
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 100,
+      "panels": [],
+      "title": "Row 1 — Retry scheduling rate",
+      "type": "row"
+    },
+    {
+      "id": 1,
+      "title": "task_retry_scheduled_total — per-minute rate by failureClass",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 1 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisLabel": "retries / min",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 1,
+            "spanNulls": false
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 10 }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "editorMode": "code",
+          "expr": "sum by (failureClass) (rate(task_retry_scheduled_total{instance=~\"$instance\"}[1m])) * 60",
+          "legendFormat": "{{failureClass}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "alert": {
+        "name": "Retry storm: transient_error rate exceeds 10/min",
+        "conditions": [
+          {
+            "evaluator": { "params": [10], "type": "gt" },
+            "operator": { "type": "and" },
+            "query": { "params": ["A", "5m", "now"] },
+            "reducer": { "params": [], "type": "avg" },
+            "type": "query"
+          }
+        ],
+        "executionErrorState": "alerting",
+        "for": "5m",
+        "frequency": "1m",
+        "handler": 1,
+        "noDataState": "no_data",
+        "notifications": [],
+        "annotations": {
+          "summary": "Retry storm: transient_error rate exceeds 10/min",
+          "runbook_url": "https://github.com/ai-workflow/my-space/blob/main/docs/runbooks/retry-troubleshooting.md#sop-1-retry-%E9%A3%8E%E6%9A%B4-transient_error-retry-storm",
+          "severity": "warning"
+        }
+      }
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 10 },
+      "id": 200,
+      "panels": [],
+      "title": "Row 2 — Exhausted retries & classification warnings",
+      "type": "row"
+    },
+    {
+      "id": 2,
+      "title": "task_retry_exhausted_total by failureClass / reason",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 11 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "drawStyle": "line", "fillOpacity": 8, "lineWidth": 1 },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["sum"] },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "sum by (failureClass, reason) (rate(task_retry_exhausted_total{instance=~\"$instance\"}[5m]))",
+          "legendFormat": "{{failureClass}} / {{reason}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "task_retry_classification_warning_total — rate",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 11 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "drawStyle": "line", "fillOpacity": 8, "lineWidth": 1 },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "single" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "sum(rate(task_retry_classification_warning_total{instance=~\"$instance\"}[5m]))",
+          "legendFormat": "warnings/sec",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 20 },
+      "id": 300,
+      "panels": [],
+      "title": "Row 3 — Lock telemetry",
+      "type": "row"
+    },
+    {
+      "id": 4,
+      "title": "retry_scheduler_lock_stolen_total — last 1h",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "h": 7, "w": 6, "x": 0, "y": 21 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 1 },
+              { "color": "red", "value": 5 }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "sum(increase(retry_scheduler_lock_stolen_total{instance=~\"$instance\"}[1h]))",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "retry_scheduler_lock_reclaimed_total by cause",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "h": 7, "w": 12, "x": 6, "y": 21 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "drawStyle": "line", "fillOpacity": 8, "lineWidth": 1 },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["sum"] },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "sum by (cause) (rate(retry_scheduler_lock_reclaimed_total{instance=~\"$instance\"}[5m]))",
+          "legendFormat": "{{cause}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "retry_scheduler_lock_stale_files",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "h": 7, "w": 6, "x": 18, "y": 21 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 3 },
+              { "color": "red", "value": 5 }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "max(retry_scheduler_lock_stale_files{instance=~\"$instance\"})",
+          "refId": "A"
+        }
+      ],
+      "alert": {
+        "name": "retry_scheduler_lock_stale_files > 5",
+        "conditions": [
+          {
+            "evaluator": { "params": [5], "type": "gt" },
+            "operator": { "type": "and" },
+            "query": { "params": ["A", "5m", "now"] },
+            "reducer": { "params": [], "type": "max" },
+            "type": "query"
+          }
+        ],
+        "executionErrorState": "alerting",
+        "for": "5m",
+        "frequency": "1m",
+        "handler": 1,
+        "noDataState": "ok",
+        "notifications": [],
+        "annotations": {
+          "summary": "Retry scheduler stale lock files exceed 5",
+          "runbook_url": "https://github.com/ai-workflow/my-space/blob/main/docs/runbooks/retry-troubleshooting.md#sop-2-lock-stale-%E7%B4%AF%E7%A7%AF-retry-scheduler-lock-stale-file-buildup",
+          "severity": "warning"
+        }
+      }
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 28 },
+      "id": 400,
+      "panels": [],
+      "title": "Row 4 — Schema migration",
+      "type": "row"
+    },
+    {
+      "id": 7,
+      "title": "task_schema_migration_total — last 24h",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 29 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "sum(increase(task_schema_migration_total{instance=~\"$instance\"}[24h]))",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "task_schema_migration_failed_total by errorClass — last 1h",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "h": 8, "w": 16, "x": 8, "y": 29 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "drawStyle": "bars", "fillOpacity": 60, "lineWidth": 1 },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["sum"] },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "sum by (errorClass) (increase(task_schema_migration_failed_total{instance=~\"$instance\"}[1h]))",
+          "legendFormat": "{{errorClass}}",
+          "refId": "A"
+        }
+      ],
+      "alert": {
+        "name": "task_schema_migration_failed_total > 0",
+        "conditions": [
+          {
+            "evaluator": { "params": [0], "type": "gt" },
+            "operator": { "type": "and" },
+            "query": { "params": ["A", "5m", "now"] },
+            "reducer": { "params": [], "type": "sum" },
+            "type": "query"
+          }
+        ],
+        "executionErrorState": "alerting",
+        "for": "0s",
+        "frequency": "30s",
+        "handler": 1,
+        "noDataState": "ok",
+        "notifications": [],
+        "annotations": {
+          "summary": "Task schema migration failure detected — page",
+          "runbook_url": "https://github.com/ai-workflow/my-space/blob/main/docs/runbooks/retry-troubleshooting.md#sop-3-schema-migration-%E5%A4%B1%E8%B4%A5-task-schema-migration-failure",
+          "severity": "page"
+        }
+      }
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 37 },
+      "id": 500,
+      "panels": [],
+      "title": "Row 5 — Blocked tasks & resolutions",
+      "type": "row"
+    },
+    {
+      "id": 9,
+      "title": "task_blocked_total by blockedReason",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 38 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 1 },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["sum"] },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "sum by (blockedReason) (rate(task_blocked_total{instance=~\"$instance\"}[5m]))",
+          "legendFormat": "{{blockedReason}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "title": "task_block_resolution_total by action",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 38 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 1 },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["sum"] },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "sum by (action) (rate(task_block_resolution_total{instance=~\"$instance\"}[5m]))",
+          "legendFormat": "{{action}}",
+          "refId": "A"
+        }
+      ]
+    }
+  ]
+}
