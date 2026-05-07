@@ -6,34 +6,31 @@
 
 ## Current Phase
 
-Phase 6: Executor + Tools + Skills + CriticalNodePolicy — PENDING
+Phase 7: Retry + Blocked + Notify Throttling + Recovery Hardening — PENDING
 
 ## Completed Phases
 
-### Phase 0–4 (summarized above)
+### Phase 0–5 (summarized above)
 
-- 0: scaffold; 1: contracts; 2: fs-store; 3: repos+recovery; 4: api+sse.
-
-### Phase 5: ThreadLoop + MessageGuard + Confirmation + Plan Revision — 2026-05-07
+### Phase 6: Executor + Tools + Skills + CriticalNodePolicy — 2026-05-07
 
 Verification:
-- `pnpm -r build` / `test` / `lint` → green.
-- bot-runtime: 39 tests across 7 files (added: message-guard×6, thread-loop×7, eval×1).
-- `pnpm test:evals` → message-guard eval passes (10-row bundled).
+- `pnpm -r build` / `lint` → green
+- bot-runtime: 53 tests across 10 files (added 14: critical-node ×6, skills ×4, executor ×4)
+- contracts:45, fs-store:27, bot-runtime:53 → 125 unit tests
+- `pnpm test:evals` → 1 eval green
 
 Modules:
-- `apps/bot-runtime/src/thread-loop/message-guard.ts` — rule short-circuits + LLM adapter slot + `guard_degraded` fallback.
-- `apps/bot-runtime/src/thread-loop/thread-loop.ts` — drains `control.json` pendingSignals (cancel/pause/resume/manual_retry/skip/critical_node_decision/revise) and emits durable events.
-- `apps/bot-runtime/src/thread-loop/task-drafts.ts` — draft creation + owner-first confirmation that appends to TaskList.
-- `apps/bot-runtime/src/thread-loop/plan-revisions.ts` — full revision: pause→PlanRevision→ChangeRecord→artifact archive→retry reset (when failed)→plan_revised event.
-- `apps/bot-runtime/src/evals/{harness,index}.ts` — JSONL dataset loader + scoreClassification (accuracy + micro-F1 + per-label).
-- `tests/evals/datasets/{message-guard,task-confirmation,plan-revision}.jsonl` — bundled labeled samples (10/3/3 rows).
+- `apps/bot-runtime/src/critical-node/policy-engine.ts` — built-in baseline (high-risk skill require_approval), strictness-max resolver (block > require_approval > log_only), all NodeMatcher kinds, hot-reload via `setPolicies`.
+- `apps/bot-runtime/src/skills/registry.ts` — SkillRegistry that recurses skill dirs, parses YAML frontmatter, snake→camel mapping, isolates per-skill failures into `skills_load_error` records (field uses snake_case).
+- `apps/bot-runtime/src/tools/registry.ts` — ToolRegistry + 6 built-in tools (read_file, write_file, list_dir, str_replace, ask_clarification, present_files) with Zod-validated input + path-safe scoped roots.
+- `apps/bot-runtime/src/executor/{executor,model-adapter}.ts` — Executor loop: queued→running, per-step CriticalNodePolicy evaluation (re-evaluated every dispatch), tool dispatch, classify failures (transient/assertion/permission), ask_clarification → blocked. ScriptedAdapter for tests.
 
 ## Phase Index
 
-- [x] Phase 0–4 above
-- [x] Phase 5: ThreadLoop, MessageGuard, Task Confirmation, Plan Revision
-- [ ] Phase 6: Executor, Runtime Loop, Tools, Skills, CriticalNodePolicy
+- [x] Phase 0–5 above
+- [x] Phase 6: Executor, Runtime Loop, Tools, Skills, CriticalNodePolicy
+- [ ] Phase 7: Retry, Blocked Actions, Notify Throttling, Recovery Hardening
 - [ ] Phase 6: Executor, Runtime Loop, Tools, Skills, CriticalNodePolicy
 - [ ] Phase 7: Retry, Blocked Actions, Notify Throttling, Recovery Hardening
 - [ ] Phase 8: Channel Subsystem, Feishu Provider
