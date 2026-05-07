@@ -83,6 +83,40 @@ export class Executor {
 
     let steps = 0;
     while (steps < limit) {
+      // Poll control.json before every dispatch so cancel/pause preempt the
+      // loop between tool calls (per Phase 6 review F2).
+      const ctl = await this.deps.rt.tasks.readControl(opts.threadId, opts.taskId);
+      if (ctl) {
+        const cancel = ctl.pendingSignals.find((s) => s.kind === 'cancel');
+        const pause = ctl.pendingSignals.find((s) => s.kind === 'pause');
+        if (cancel) {
+          task = applyTaskTransition(task, 'cancelled', { now: this.now });
+          await this.deps.rt.tasks.update(task);
+          const ev = await this.deps.rt.tasks.appendEvent(opts.threadId, task.id, {
+            kind: 'task_cancelled',
+            taskId: task.id,
+            threadId: opts.threadId,
+            payload: { actorUserId: cancel.userId, source: 'executor' },
+            at: this.now,
+          });
+          if (this.deps.sse) this.deps.sse.publish(ev);
+          return { finalStatus: 'cancelled', steps };
+        }
+        if (pause) {
+          task = applyTaskTransition(task, 'paused', { now: this.now });
+          await this.deps.rt.tasks.update(task);
+          const ev = await this.deps.rt.tasks.appendEvent(opts.threadId, task.id, {
+            kind: 'task_paused',
+            taskId: task.id,
+            threadId: opts.threadId,
+            payload: { actorUserId: pause.userId, source: 'executor' },
+            at: this.now,
+          });
+          if (this.deps.sse) this.deps.sse.publish(ev);
+          return { finalStatus: 'paused', steps };
+        }
+      }
+
       // CriticalNodePolicy may have been hot-reloaded; we re-evaluate per call.
       const proposed = await opts.adapter.proposeTool({
         taskTitle: task.title,

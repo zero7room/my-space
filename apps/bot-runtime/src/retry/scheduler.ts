@@ -113,7 +113,9 @@ export class RetryScheduler {
 
   /**
    * Find tasks whose `nextRetryAt` is past and re-queue them via the
-   * `autoRetry` path.
+   * `autoRetry` path. Honors `lastUserSignal*`: if the most recent signal is
+   * `cancel` after the last failure, emit `task_retry_skipped` and keep
+   * `failed`. If the last signal is `pause`, also skip until resumed.
    */
   async tickForThread(threadId: string): Promise<Task[]> {
     const tasks = await this.rt.tasks.listForThread(threadId);
@@ -123,6 +125,32 @@ export class RetryScheduler {
       const r = t.retry;
       if (!r?.nextRetryAt) continue;
       if (Date.parse(r.nextRetryAt) > this.now()) continue;
+      if (
+        t.lastUserSignalAt &&
+        r.lastFailureAt &&
+        Date.parse(t.lastUserSignalAt) > Date.parse(r.lastFailureAt)
+      ) {
+        if (t.lastUserSignalKind === 'cancel') {
+          await this.rt.tasks.appendEvent(threadId, t.id, {
+            kind: 'task_retry_exhausted',
+            taskId: t.id,
+            threadId,
+            payload: { reason: 'user_cancel_supersedes' },
+            at: new Date(this.now()).toISOString(),
+          });
+          continue;
+        }
+        if (t.lastUserSignalKind === 'pause') {
+          await this.rt.tasks.appendEvent(threadId, t.id, {
+            kind: 'task_retry_exhausted',
+            taskId: t.id,
+            threadId,
+            payload: { reason: 'user_pause_active' },
+            at: new Date(this.now()).toISOString(),
+          });
+          continue;
+        }
+      }
       try {
         const next = applyTaskTransition(t, 'queued', {
           autoRetry: true,
