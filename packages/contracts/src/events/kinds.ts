@@ -128,6 +128,8 @@ export const CHANNEL_EVENT_KINDS = [
 export type ChannelEventKind = (typeof CHANNEL_EVENT_KINDS)[number];
 
 export const RUNTIME_EVENT_KINDS = [
+  'message_appended',
+  'guard_decision_recorded',
   'runtime_started',
   'runtime_stopped',
   'runtime_recovery_scan_started',

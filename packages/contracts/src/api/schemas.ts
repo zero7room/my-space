@@ -67,7 +67,11 @@ export const postMessageResponseSchema = z.object({
 export type PostMessageResponse = z.infer<typeof postMessageResponseSchema>;
 
 export const ackRequestSchema = z
-  .object({ lastEventId: idString })
+  .object({
+    lastEventId: idString.optional(),
+    cursor: z.number().int().nonnegative().optional(),
+    ackedAt: isoTimestamp.optional(),
+  })
   .strict();
 export type AckRequest = z.infer<typeof ackRequestSchema>;
 

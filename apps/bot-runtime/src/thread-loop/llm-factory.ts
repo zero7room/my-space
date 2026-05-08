@@ -54,11 +54,135 @@ export function resolveLlmGuardAdapter(env: LlmEnv = process.env as LlmEnv): Llm
   return new HeuristicLlmGuard();
 }
 
+export interface ChatMessageInput {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface ChatReplyInput {
+  threadId: string;
+  messages: ChatMessageInput[];
+}
+
+export interface ChatModelAdapter {
+  generateReply(input: ChatReplyInput): Promise<string | undefined>;
+}
+
+export function resolveChatModelAdapter(
+  env: LlmEnv = process.env as LlmEnv,
+): ChatModelAdapter {
+  const provider = (env.LLM_PROVIDER ?? 'heuristic').toLowerCase();
+  const apiKey = env.LLM_API_KEY ?? '';
+  if (!apiKey || provider === 'heuristic') return new UnavailableChatAdapter();
+  const cfg = {
+    apiKey,
+    model:
+      env.LLM_MODEL ??
+      (provider === 'anthropic' ? 'claude-opus-4-7' : 'gpt-4.1'),
+    baseUrl:
+      env.LLM_BASE_URL ??
+      (provider === 'anthropic'
+        ? 'https://api.anthropic.com'
+        : 'https://api.openai.com/v1'),
+    timeoutMs: Number.parseInt(env.LLM_TIMEOUT_MS ?? '15000', 10),
+  };
+  if (provider === 'anthropic') return new AnthropicChatAdapter(cfg);
+  if (provider === 'openai') return new OpenAIChatAdapter(cfg);
+  return new UnavailableChatAdapter();
+}
+
 interface RemoteCfg {
   apiKey: string;
   model: string;
   baseUrl: string;
   timeoutMs: number;
+}
+
+class UnavailableChatAdapter implements ChatModelAdapter {
+  async generateReply(): Promise<string | undefined> {
+    return undefined;
+  }
+}
+
+const CHAT_SYSTEM_PROMPT =
+  '你是 my-space 的 AI 员工。用简体中文自然回复用户。普通聊天要简洁；如果用户表达明确任务需求，不要执行任务，只说明将进入任务确认流程。';
+
+export class AnthropicChatAdapter implements ChatModelAdapter {
+  constructor(private readonly cfg: RemoteCfg) {}
+
+  async generateReply(input: ChatReplyInput): Promise<string | undefined> {
+    const ac = new AbortController();
+    const timer = setTimeout(() => ac.abort(), this.cfg.timeoutMs);
+    try {
+      const res = await fetch(`${this.cfg.baseUrl}/v1/messages`, {
+        method: 'POST',
+        headers: {
+          'x-api-key': this.cfg.apiKey,
+          'anthropic-version': '2023-06-01',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: this.cfg.model,
+          max_tokens: 800,
+          system: CHAT_SYSTEM_PROMPT,
+          messages: input.messages.map((m) => ({
+            role: m.role,
+            content: m.content,
+          })),
+        }),
+        signal: ac.signal,
+      });
+      if (!res.ok) return undefined;
+      const json = (await res.json()) as {
+        content?: Array<{ type: string; text?: string }>;
+      };
+      const text = json.content?.find((c) => c.type === 'text')?.text?.trim();
+      return text || undefined;
+    } catch {
+      return undefined;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+}
+
+export class OpenAIChatAdapter implements ChatModelAdapter {
+  constructor(private readonly cfg: RemoteCfg) {}
+
+  async generateReply(input: ChatReplyInput): Promise<string | undefined> {
+    const ac = new AbortController();
+    const timer = setTimeout(() => ac.abort(), this.cfg.timeoutMs);
+    try {
+      const res = await fetch(`${this.cfg.baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${this.cfg.apiKey}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: this.cfg.model,
+          messages: [
+            { role: 'system', content: CHAT_SYSTEM_PROMPT },
+            ...input.messages.map((m) => ({
+              role: m.role,
+              content: m.content,
+            })),
+          ],
+        }),
+        signal: ac.signal,
+      });
+      if (!res.ok) return undefined;
+      const json = (await res.json()) as {
+        choices?: Array<{ message?: { content?: string } }>;
+      };
+      const text = json.choices?.[0]?.message?.content?.trim();
+      return text || undefined;
+    } catch {
+      return undefined;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
 }
 
 const INTENTS = [

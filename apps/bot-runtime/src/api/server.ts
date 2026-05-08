@@ -33,6 +33,10 @@ import { AckSweeper, SseRegistry } from '../runtime/sse/index.js';
 import { TaskIndex } from '../runtime/task-index.js';
 import { DedupeReaper } from '../runtime/dedupe-reaper.js';
 import { SkillRegistry } from '../skills/registry.js';
+import {
+  resolveChatModelAdapter,
+  type ChatModelAdapter,
+} from '../thread-loop/llm-factory.js';
 
 import { registerHealthRoutes } from './routes/health.js';
 import { registerUserRoutes } from './routes/users.js';
@@ -52,6 +56,8 @@ export interface ServerConfig {
   localUserTokens?: string;
   /** Skip lock acquisition (useful for tests with multiple servers). */
   skipLock?: boolean;
+  /** Optional test/production override for chat replies. */
+  chatModel?: ChatModelAdapter;
 }
 
 export interface ServerHandle {
@@ -163,7 +169,9 @@ export async function createServer(cfg: ServerConfig): Promise<ServerHandle> {
 
   registerHealthRoutes(app, { rt, lock, startedAt: new Date().toISOString() });
   registerUserRoutes(app);
-  registerThreadRoutes(app, { rt, sse, taskIndex });
+  const chatModel = cfg.chatModel ?? resolveChatModelAdapter();
+
+  registerThreadRoutes(app, { rt, sse, taskIndex, chatModel });
   registerTaskRoutes(app, { rt, sse, taskIndex });
   registerArtifactRoutes(app, { rt });
   registerChannelRoutes(app, { rt });
