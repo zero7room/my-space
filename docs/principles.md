@@ -10,8 +10,11 @@
 - **状态实时回写**：进度、阻塞、决策、未决问题立即写入文档；中断前最后一笔必须是回写状态。
 - **目录约定**：
   - `docs/requirements/`：需求，`N.requirements.md`
-  - `docs/design/`：设计，`architecture.md` 与 `N.design.md`
-  - `docs/tasks/N-<slug>/N-<phase>-phase.md`：分阶段任务
+  - `docs/design/`：设计，`architecture.md` 为总览，子模块拆到 `docs/design/modules/<module>.md`
+  - `docs/tasks/N-<slug>/N-<phase>-phase.md`：分阶段任务。`<phase>` 推荐序列为 `1-plan` → `2-build` → `3-review`；同一阶段重启时序号续编（如 `4-rebuild`），不复用旧文件
+    - 当前实例：`docs/tasks/1-task/1-plan-phase.md`（N=1，slug=task，phase=1-plan）。slug 取项目代号或任务主题，任务序号（N）递增不复用
+    - 同目录可平铺非 `-phase.md` 的附属产物（spike 报告、采样数据、中间 fixture 等），文件名按内容描述，如 `data-source-spike.md`
+  - `docs/decisions/`：跨阶段沉淀的 ADR，按 `ADR-NNN-<slug>.md` 命名，新决议 append-only
 
 每个 phase 文件包含：目标、前置依赖、任务清单（含验收标准）、当前状态、决策记录、未决问题、Review 结论。
 
