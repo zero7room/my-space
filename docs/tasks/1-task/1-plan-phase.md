@@ -72,8 +72,8 @@
   - 验收：`alembic upgrade head` 在干净 PG 上成功；`alembic downgrade base` 反向也成功。
 - [ ] **M0-T4** Pre-commit：ruff（lint+format）、mypy --strict、pytest -q（空套件即可）、conventional-commit hook
   - 验收：`pre-commit run --all-files` 全绿；故意提交一条不合规 commit message 被拦截。
-- [ ] **M0-T5** Docker Compose：`docker-compose up` 拉起 `pg` + `redis` + `backend` + `worker` + `web` + `caddy`
-  - 验收：`docker compose up -d`，所有容器健康；`curl localhost/healthz` 200。
+- [ ] **M0-T5** Docker Compose 基础骨架：先拉起 `pg` + `redis` + `backend` + `worker`；`web` + `caddy` 在 M0-T6 / M0-T8b 完成后接入同一 compose
+  - 验收：后端阶段 `docker compose up -d pg redis backend worker` 全部健康且 `curl localhost:8000/healthz` 200；M0 出口前 `docker compose up -d` 可拉起 `pg` + `redis` + `backend` + `worker` + `web` + `caddy`，所有容器健康，`curl localhost/healthz` 200。
 
 #### 前端
 - [ ] **M0-T6** Next.js 16 工程 `web/` 初始化，启用 App Router、React 19、Tailwind v4、shadcn init
@@ -88,7 +88,7 @@
 #### 跨栈
 - [ ] **M0-T9** 创建 `docs/decisions/` 目录与 ADR 索引模板（`README.md`），不复制 §14/§15 内容；后续跨阶段决议按 `ADR-NNN-<slug>.md` append-only 落档
   - 验收：`docs/decisions/README.md` 存在，首段写明"决议初值来源 = requirements §14/§15（含本期 16 项）+ 后续 ADR"；索引区列出当前 ADR 目录下所有 `ADR-*.md` 文件。
-- [ ] **M0-T9b** 落档可观测性 metrics 命名 ADR（`docs/decisions/ADR-NNN-metrics-naming.md`），约定第一阶段 4 类核心 metric 的命名、标签集、单位、基数边界
+- [ ] **M0-T9b** 落档可观测性 metrics 命名 ADR（`docs/decisions/ADR-001-metrics-naming.md`），约定第一阶段 4 类核心 metric 的命名、标签集、单位、基数边界
   - 验收：ADR 文件存在；列出 `runs_total{skill,status,trigger}`、`alerts_total{priority,channel,state}`、`llm_tokens_total{provider,model,task_kind}`、`collector_failures_total{source,error_type}` 的语义、单位与禁止的高基数标签（如 `subject_id`）；M1–M6 中所有新增 metric 必须先 append 到此 ADR 才能注册到 Prometheus（M6-T2 验收会回溯检查）。
 
 **M0 出口标准**：本地一键 `make dev` 能起完整栈；CI 在 push / PR 全绿；ADR 索引模板与 metrics 命名 ADR 落档。
@@ -148,7 +148,7 @@
   - `run_artifact(run_id FK PK, artifact_path, summary)`
   - `conversation_thread(id UUID PK, title, subject_ref JSONB, tags TEXT[], pinned, created_at, last_message_at, archived_at)`
   - `conversation_reference(thread_id FK, run_id FK, evidence_id FK?, message_idx)`
-  - 验收：mock RunRequest 跑完后 `run` + `trace_event` + `run_artifact` 都有记录；`run.run_id` 与 `/runs/{date}/{skill}/{run_id}/` 文件目录路径互通；`conversation_thread` 软删除走 `archived_at`、不物理删除；`conversation_reference` 反查"哪些 thread 引用过此 Artifact"返回正确。
+  - 验收：mock RunRequest 跑完后 `run` + `trace_event` + `run_artifact` 都有记录；`run.id` 与 `/runs/{date}/{skill}/{run_id}/` 文件目录路径互通；`conversation_thread` 软删除走 `archived_at`、不物理删除；`conversation_reference` 反查"哪些 thread 引用过此 Artifact"返回正确。
 
 **M1 出口标准**:Spike 报告通过 → 执行一次"日终采集"脚本,覆盖 §12.2 全部板块和美股龙头;Evidence、Conclusion Sink、关系边强约束生效;§12.2 五条手工边已录入；运行时基础表与会话基础表迁移完成可承接 M2/M3/M5b。
 
@@ -287,6 +287,7 @@
 - **2026-05-08 第二轮自检**:任务编号无冲突,跨文档引用闭环(详见 §九),无悬空链接。
 - **2026-05-08 第二轮 review 修订**:发现 13 项可执行性盲点(阈值数学矛盾、龙头权重数值缺失、产业链地位维度第一阶段口径、货币 / 时区跨市场约束、Artifact 字段边界、日报机制、ADR-001 价值、Sector ID 命名 / Cmd+K / API key 加载 / 测试金字塔等),全部已落到对应 requirements / design 文档,plan-phase 同步 M0-T9、M1-T2,以及目录重命名 `1-mcp → 1-task` 内部引用刷新;详见 §9.2。
 - **2026-05-08 第三轮 review 修订**:补全设计文档中已规定但 plan-phase 未单列的 5 类基础任务(metrics 命名 ADR、运行时/会话表迁移、API payload schema 凝固、`alert_record` 迁移、`revoke_conclusion` 接口契约);新增 M0-T9b、M1-T15b、M2-T0、M4-T0,扩展 M1-T14 / M6-T2 验收;任务总数从 65 增至 69(此前历史登记的 66 为计数误差,已校正),估时仍 12.5 周(落入原 ~20% 缓冲);详见 §9.3。
+- **2026-05-08 第四轮小修**:修正 M0-T5 与前端脚手的执行顺序依赖,将 metrics ADR 文件名明确为 `ADR-001-metrics-naming.md`,统一运行时表字段口径为 `run.id`;不改变任务范围与任务总数,详见 §9.4。
 - `docs/requirements/1.requirements.md` 与 `docs/design/architecture.md` 已同步纳入 16 项决议。
 - 全部任务状态:`pending`,**待用户终审通过后**进入 build phase。
 
@@ -412,6 +413,24 @@
 
 - 评审结论:
   - [x] 第三轮意见已全部处置
+  - [ ] **用户终审通过**(签字行)
+  - 终审日期:
+  - 终审备注:
+
+### 9.4 第四轮小修(2026-05-08)
+
+- 评审人:用户(询问"是否具备可执行条件")
+- 评审范围:plan-phase 的执行顺序、文件命名与字段一致性
+- 主要意见与处置:
+
+| # | 意见 | 处置 | 落点 |
+|---|---|---|---|
+| R4-01 | M0-T5 要求完整 Docker Compose,但 `web/` 在 M0-T6 才创建,存在顺序依赖 | M0-T5 改为"基础 compose 先起后端依赖,完整 compose 在 M0 出口验收" | M0-T5 |
+| R4-02 | `ADR-NNN-metrics-naming.md` 是占位文件名,执行者可能照字面创建 | 明确为 `ADR-001-metrics-naming.md` | M0-T9b |
+| R4-03 | M1-T15b schema 使用 `run.id`,验收写 `run.run_id`,字段口径不一致 | 统一验收口径为 `run.id` | M1-T15b |
+
+- 评审结论:
+  - [x] 第四轮小修已全部处置
   - [ ] **用户终审通过**(签字行)
   - 终审日期:
   - 终审备注:
