@@ -34,6 +34,7 @@ playwright-report/
 test-results/
 
 # Runtime data and logs
+data/backups/
 data/raw/
 logs/
 *.log
