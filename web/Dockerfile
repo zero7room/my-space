@@ -31,6 +31,10 @@ ENV NODE_ENV=production \
 
 COPY --from=builder /app ./
 
+# Use the upstream node image's pre-existing non-root user.
+RUN chown -R node:node /app
+USER node
+
 EXPOSE 3000
 
 CMD ["pnpm", "start"]

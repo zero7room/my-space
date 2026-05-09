@@ -2,11 +2,11 @@ services:
   pg:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: my_space
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ${POSTGRES_DB:-my_space}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d my_space"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-my_space}"]
       interval: 5s
       timeout: 3s
       retries: 20
@@ -32,7 +32,7 @@ services:
     build:
       context: ./backend
     environment:
-      DATABASE_URL: postgresql+psycopg://postgres:postgres@pg:5432/my_space
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://postgres:postgres@pg:5432/my_space}
     depends_on:
       pg:
         condition: service_healthy
@@ -57,7 +57,7 @@ services:
       context: ./backend
     command: ["python", "-c", "import time; print('worker placeholder ready', flush=True); time.sleep(3650 * 24 * 60 * 60)"]
     environment:
-      DATABASE_URL: postgresql+psycopg://postgres:postgres@pg:5432/my_space
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://postgres:postgres@pg:5432/my_space}
     depends_on:
       pg:
         condition: service_healthy
