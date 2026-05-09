@@ -1,0 +1,13 @@
+{
+  "name": "my-space",
+  "private": true,
+  "packageManager": "pnpm@10.32.1",
+  "scripts": {
+    "dev": "docker compose up --build",
+    "verify": "make verify",
+    "web:lint": "pnpm --filter @my-space/web lint",
+    "web:typecheck": "pnpm --filter @my-space/web typecheck",
+    "web:test": "pnpm --filter @my-space/web test",
+    "web:e2e": "pnpm --filter @my-space/web test:e2e"
+  }
+}

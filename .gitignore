@@ -1,0 +1,44 @@
+# macOS
+.DS_Store
+
+# Editor and local tooling
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Environment
+.env
+.env.*
+backend/openapi.json
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.venv/
+venv/
+dist/
+build/
+*.egg-info/
+
+# Node
+node_modules/
+.next/
+out/
+coverage/
+playwright-report/
+test-results/
+
+# Runtime data and logs
+data/raw/
+logs/
+*.log
+
+# Docker and local state
+.docker/
+tmp/
+*.pid
