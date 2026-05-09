@@ -22,7 +22,7 @@
 | `docs/requirements/1.requirements.md`（含 §14 关键决议、§15 客户端规划） | ✅ 已就绪 |
 | `docs/design/architecture.md`（已纳入决议增量；§10 已映射） | ✅ 已就绪 |
 | `docs/principles.md`（开发准则） | ✅ 已就绪 |
-| 用户对本 plan-phase 的评审确认 | ⏳ 待办 |
+| 用户对本 plan-phase 的评审确认 | ✅ 2026-05-08 已通过（用户指令“执行 docs/tasks/1-task/1-plan-phase.md”视为终审通过） |
 
 ---
 
@@ -37,6 +37,8 @@
 | 前端 | Next.js 16（App Router · RSC）· React 19 · Tailwind v4 · shadcn/ui · ECharts · Cytoscape.js · TanStack Query · Zustand |
 | 工程化 | uv（Python 包管理）· pnpm（Node）· ruff · mypy · pytest · ESLint flat · Prettier · Vitest · Playwright |
 | 部署 | 单机 Docker Compose（pg + redis + backend + worker + web + caddy） |
+
+> 2026-05-09 build 口径说明：上表仍是原始目标技术栈。当前仓库已完成“本地可验证闭环”，其中 LLM、通知、真实行情、SSE、Scheduler/Celery、ECharts/Cytoscape、HTTPS/Grafana 等外部或生产依赖项以 stub/mock/轻量替代方式先闭环；真实验收缺口见 [`3-build-all-phase.md`](./3-build-all-phase.md)。
 
 ---
 
@@ -64,31 +66,31 @@
 ### M0 · 工程基线
 
 #### 后端
-- [ ] **M0-T1** 创建后端 monorepo 骨架 `backend/`，子包 `app/{api,domain,data,runtime,orchestration,skills,llm}`
+- [x] **M0-T1** 创建后端 monorepo 骨架 `backend/`，子包 `app/{api,domain,data,runtime,orchestration,skills,llm}`
   - 验收：`uv run python -c "import app"` 通过；`tree -L 3 backend` 与本规划一致。
-- [ ] **M0-T2** 接入 FastAPI 入口、健康检查 `/healthz`、`/readyz`、统一异常 / 日志中间件
+- [x] **M0-T2** 接入 FastAPI 入口、健康检查 `/healthz`、`/readyz`、统一异常 / 日志中间件
   - 验收：`uv run uvicorn app.main:app` 后两个端点返回 200；错误返回 RFC 7807 风格 JSON。
-- [ ] **M0-T3** 接入 SQLAlchemy 2.x + Alembic，初始化 `alembic/env.py`、`migrations/0001_init.py`（仅扩展和 schema）
+- [x] **M0-T3** 接入 SQLAlchemy 2.x + Alembic，初始化 `alembic/env.py`、`migrations/0001_init.py`（仅扩展和 schema）
   - 验收：`alembic upgrade head` 在干净 PG 上成功；`alembic downgrade base` 反向也成功。
-- [ ] **M0-T4** Pre-commit：ruff（lint+format）、mypy --strict、pytest -q（空套件即可）、conventional-commit hook
+- [x] **M0-T4** Pre-commit：ruff（lint+format）、mypy --strict、pytest -q（空套件即可）、conventional-commit hook
   - 验收：`pre-commit run --all-files` 全绿；故意提交一条不合规 commit message 被拦截。
-- [ ] **M0-T5** Docker Compose 基础骨架：先拉起 `pg` + `redis` + `backend` + `worker`；`web` + `caddy` 在 M0-T6 / M0-T8b 完成后接入同一 compose
+- [x] **M0-T5** Docker Compose 基础骨架：先拉起 `pg` + `redis` + `backend` + `worker`；`web` + `caddy` 在 M0-T6 / M0-T8b 完成后接入同一 compose
   - 验收：后端阶段 `docker compose up -d pg redis backend worker` 全部健康且 `curl localhost:8000/healthz` 200；M0 出口前 `docker compose up -d` 可拉起 `pg` + `redis` + `backend` + `worker` + `web` + `caddy`，所有容器健康，`curl localhost/healthz` 200。
 
 #### 前端
-- [ ] **M0-T6** Next.js 16 工程 `web/` 初始化，启用 App Router、React 19、Tailwind v4、shadcn init
+- [x] **M0-T6** Next.js 16 工程 `web/` 初始化，启用 App Router、React 19、Tailwind v4、shadcn init
   - 验收：`pnpm dev` 启动，根路由渲染 shadcn 默认 Button。
-- [ ] **M0-T7** OpenAPI client codegen 流水线：`pnpm gen:api` 从 `http://localhost:8000/openapi.json` 生成 `web/lib/api/`
+- [x] **M0-T7** OpenAPI client codegen 流水线：`pnpm gen:api` 从 `http://localhost:8000/openapi.json` 生成 `web/lib/api/`
   - 验收：FastAPI 暴露空路由 `/api/v1/ping`；前端调用类型不报错。
-- [ ] **M0-T8** ESLint flat + Prettier + Vitest + Playwright 基础脚手
+- [x] **M0-T8** ESLint flat + Prettier + Vitest + Playwright 基础脚手
   - 验收：`pnpm lint && pnpm typecheck && pnpm test && pnpm test:e2e` 全部跑通空套件。
-- [ ] **M0-T8b** 前端 mock 流水线:MSW(Mock Service Worker)接入,以 OpenAPI codegen 的类型为约束生成 handlers
+- [x] **M0-T8b** 前端 mock 流水线:MSW(Mock Service Worker)接入,以 OpenAPI codegen 的类型为约束生成 handlers
   - 验收:M5 之前后端接口缺位时,前端可全 mock 启动;`pnpm dev:mock` 启用 MSW。
 
 #### 跨栈
-- [ ] **M0-T9** 创建 `docs/decisions/` 目录与 ADR 索引模板（`README.md`），不复制 §14/§15 内容；后续跨阶段决议按 `ADR-NNN-<slug>.md` append-only 落档
+- [x] **M0-T9** 创建 `docs/decisions/` 目录与 ADR 索引模板（`README.md`），不复制 §14/§15 内容；后续跨阶段决议按 `ADR-NNN-<slug>.md` append-only 落档
   - 验收：`docs/decisions/README.md` 存在，首段写明"决议初值来源 = requirements §14/§15（含本期 16 项）+ 后续 ADR"；索引区列出当前 ADR 目录下所有 `ADR-*.md` 文件。
-- [ ] **M0-T9b** 落档可观测性 metrics 命名 ADR（`docs/decisions/ADR-001-metrics-naming.md`），约定第一阶段 4 类核心 metric 的命名、标签集、单位、基数边界
+- [x] **M0-T9b** 落档可观测性 metrics 命名 ADR（`docs/decisions/ADR-001-metrics-naming.md`），约定第一阶段 4 类核心 metric 的命名、标签集、单位、基数边界
   - 验收：ADR 文件存在；列出 `runs_total{skill,status,trigger}`、`alerts_total{priority,channel,state}`、`llm_tokens_total{provider,model,task_kind}`、`collector_failures_total{source,error_type}` 的语义、单位与禁止的高基数标签（如 `subject_id`）；M1–M6 中所有新增 metric 必须先 append 到此 ADR 才能注册到 Prometheus（M6-T2 验收会回溯检查）。
 
 **M0 出口标准**：本地一键 `make dev` 能起完整栈；CI 在 push / PR 全绿；ADR 索引模板与 metrics 命名 ADR 落档。
@@ -288,8 +290,10 @@
 - **2026-05-08 第二轮 review 修订**:发现 13 项可执行性盲点(阈值数学矛盾、龙头权重数值缺失、产业链地位维度第一阶段口径、货币 / 时区跨市场约束、Artifact 字段边界、日报机制、ADR-001 价值、Sector ID 命名 / Cmd+K / API key 加载 / 测试金字塔等),全部已落到对应 requirements / design 文档,plan-phase 同步 M0-T9、M1-T2,以及目录重命名 `1-mcp → 1-task` 内部引用刷新;详见 §9.2。
 - **2026-05-08 第三轮 review 修订**:补全设计文档中已规定但 plan-phase 未单列的 5 类基础任务(metrics 命名 ADR、运行时/会话表迁移、API payload schema 凝固、`alert_record` 迁移、`revoke_conclusion` 接口契约);新增 M0-T9b、M1-T15b、M2-T0、M4-T0,扩展 M1-T14 / M6-T2 验收;任务总数从 65 增至 69(此前历史登记的 66 为计数误差,已校正),估时仍 12.5 周(落入原 ~20% 缓冲);详见 §9.3。
 - **2026-05-08 第四轮小修**:修正 M0-T5 与前端脚手的执行顺序依赖,将 metrics ADR 文件名明确为 `ADR-001-metrics-naming.md`,统一运行时表字段口径为 `run.id`;不改变任务范围与任务总数,详见 §9.4。
+- **2026-05-08 Build 启动**:用户明确要求执行本计划,视为 plan-phase 终审通过;已创建 `docs/tasks/1-task/2-build-phase.md` 记录 M0 实施、审查与验证状态。
+- **2026-05-09 M0 完成**:M0 工程基线已完成并通过 `make verify-m0`、`make verify-pre-commit`、完整 Docker Compose health 与 Caddy API smoke;下一步进入 `M1-T0 数据源 Spike`。
 - `docs/requirements/1.requirements.md` 与 `docs/design/architecture.md` 已同步纳入 16 项决议。
-- 全部任务状态:`pending`,**待用户终审通过后**进入 build phase。
+- 任务状态以本文件勾选项、[`2-build-phase.md`](./2-build-phase.md) 与 [`3-build-all-phase.md`](./3-build-all-phase.md) 为准；本文件中仍为 `- [ ]` 的条目表示**原计划真实验收尚未完全满足**，其中一部分已有 stub/mock 本地闭环。M0-M6 的本地可验证闭环与真实外部联调缺口以 `3-build-all-phase.md` 为准。
 
 ---
 
@@ -363,9 +367,9 @@
 
 - 评审结论:
   - [x] 第一轮意见已全部处置
-  - [ ] **用户终审通过**(签字行)
-  - 终审日期:
-  - 终审备注:
+  - [x] **用户终审通过**(签字行)
+  - 终审日期:2026-05-08
+  - 终审备注:用户指令“执行 docs/tasks/1-task/1-plan-phase.md”视为通过并进入 build phase。
 
 ### 9.2 第二轮评审(2026-05-08)
 
@@ -392,9 +396,9 @@
 
 - 评审结论:
   - [x] 第二轮意见已全部处置
-  - [ ] **用户终审通过**(签字行)
-  - 终审日期:
-  - 终审备注:
+  - [x] **用户终审通过**(签字行)
+  - 终审日期:2026-05-08
+  - 终审备注:用户指令“执行 docs/tasks/1-task/1-plan-phase.md”视为通过并进入 build phase。
 
 ### 9.3 第三轮评审(2026-05-08)
 
@@ -413,9 +417,9 @@
 
 - 评审结论:
   - [x] 第三轮意见已全部处置
-  - [ ] **用户终审通过**(签字行)
-  - 终审日期:
-  - 终审备注:
+  - [x] **用户终审通过**(签字行)
+  - 终审日期:2026-05-08
+  - 终审备注:用户指令“执行 docs/tasks/1-task/1-plan-phase.md”视为通过并进入 build phase。
 
 ### 9.4 第四轮小修(2026-05-08)
 
@@ -431,9 +435,9 @@
 
 - 评审结论:
   - [x] 第四轮小修已全部处置
-  - [ ] **用户终审通过**(签字行)
-  - 终审日期:
-  - 终审备注:
+  - [x] **用户终审通过**(签字行)
+  - 终审日期:2026-05-08
+  - 终审备注:用户指令“执行 docs/tasks/1-task/1-plan-phase.md”视为通过并进入 build phase。
 
 ---
 

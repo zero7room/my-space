@@ -1,0 +1,56 @@
+repos:
+  - repo: local
+    hooks:
+      - id: verify-docs
+        name: verify docs decisions
+        entry: make verify-docs
+        language: system
+        pass_filenames: false
+        files: ^docs/decisions/
+      - id: backend-ruff
+        name: backend ruff
+        entry: make backend-lint
+        language: system
+        pass_filenames: false
+        files: ^backend/
+      - id: backend-format
+        name: backend ruff format
+        entry: make backend-format
+        language: system
+        pass_filenames: false
+        files: ^backend/
+      - id: backend-mypy
+        name: backend mypy
+        entry: make backend-typecheck
+        language: system
+        pass_filenames: false
+        files: ^backend/
+      - id: backend-pytest
+        name: backend pytest
+        entry: make backend-test
+        language: system
+        pass_filenames: false
+        files: ^backend/
+      - id: web-lint
+        name: web lint
+        entry: make web-lint
+        language: system
+        pass_filenames: false
+        files: ^web/
+      - id: web-typecheck
+        name: web typecheck
+        entry: make web-typecheck
+        language: system
+        pass_filenames: false
+        files: ^web/
+      - id: web-test
+        name: web test
+        entry: make web-test
+        language: system
+        pass_filenames: false
+        files: ^web/
+      - id: conventional-commit
+        name: conventional commit message
+        entry: python3 scripts/check_conventional_commit.py
+        language: system
+        stages: [commit-msg]

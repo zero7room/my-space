@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: my_space
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d my_space"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.11.11"
+          enable-cache: true
+
+      - name: Set up Python
+        working-directory: backend
+        run: uv python install 3.12
+
+      - name: Sync backend
+        working-directory: backend
+        run: uv sync --all-groups --frozen
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.32.1
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+
+      - name: Install web dependencies
+        run: make web-install
+
+      - name: Verify docs and root
+        run: make verify-docs verify-root verify-compose
+
+      - name: Verify backend
+        env:
+          DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/my_space
+        run: make backend-verify verify-migrations
+
+      - name: Export OpenAPI and regenerate web client
+        run: |
+          make backend-openapi
+          cd web
+          OPENAPI_URL=../backend/openapi.json pnpm gen:api
+          git diff --exit-code -- lib/api/schema.ts
+
+      - name: Verify web
+        run: make web-verify
+
+      - name: Install Playwright browser
+        working-directory: web
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Verify E2E
+        run: make verify-e2e
+
+      - name: Verify commit hooks
+        run: make verify-pre-commit
